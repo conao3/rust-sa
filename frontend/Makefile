@@ -16,4 +16,4 @@ fmt:
 
 .PHONY: clean
 clean:
-	rm -rf dist .tanstack
+	rm -rf dist .tanstack .output
