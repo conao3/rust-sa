@@ -88,27 +88,31 @@ impl Query {
             let mut parts = line.splitn(3, '\t');
             let add = parts.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
             let del = parts.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
-            let path = match parts.next() {
-                Some(p) => p.to_string(),
+            let raw = match parts.next() {
+                Some(p) => p,
                 None => continue,
             };
-            entries.insert(
-                path.clone(),
-                FileEntry {
+            let path = normalize_renamed_path(raw);
+            entries
+                .entry(path.clone())
+                .and_modify(|e| {
+                    e.additions += add;
+                    e.deletions += del;
+                })
+                .or_insert(FileEntry {
                     path,
                     status: "modified".into(),
                     additions: add,
                     deletions: del,
-                },
-            );
+                });
         }
         for line in String::from_utf8_lossy(&name_status.stdout).lines() {
-            let mut parts = line.splitn(2, '\t');
-            let code = parts.next().unwrap_or("");
-            let path = match parts.next() {
-                Some(p) => p.to_string(),
-                None => continue,
-            };
+            let cols: Vec<&str> = line.split('\t').collect();
+            if cols.len() < 2 {
+                continue;
+            }
+            let code = cols[0];
+            let path = cols.last().unwrap().to_string();
             let status = match code.chars().next().unwrap_or(' ') {
                 'A' => "added",
                 'D' => "deleted",
@@ -190,6 +194,23 @@ struct BlobParams {
     rev: String,
     path: String,
     repo: Option<String>,
+}
+
+fn normalize_renamed_path(raw: &str) -> String {
+    if let (Some(open), Some(close)) = (raw.find('{'), raw.rfind('}')) {
+        if open < close {
+            if let Some(arrow) = raw[open..close].find(" => ") {
+                let prefix = &raw[..open];
+                let new_inner = raw[open + arrow + 4..close].trim();
+                let suffix = &raw[close + 1..];
+                return format!("{prefix}{new_inner}{suffix}");
+            }
+        }
+    }
+    if let Some(arrow) = raw.find(" => ") {
+        return raw[arrow + 4..].to_string();
+    }
+    raw.to_string()
 }
 
 fn default_repo_root() -> PathBuf {
