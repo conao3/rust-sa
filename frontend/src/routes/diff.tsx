@@ -34,6 +34,14 @@ const SAMPLE_PATCH = [
   "+console.log(farewell('rust-sa'))",
   '+',
   ' export {}',
+  'diff --git a/src/greet.ts b/src/greet.ts',
+  'index 0000000..fedcba9 100644',
+  '--- a/src/greet.ts',
+  '+++ b/src/greet.ts',
+  '@@ -1,3 +1,7 @@',
+  ' export const greet = (name: string) => `hello ${name}`',
+  '+',
+  '+export const farewell = (name: string) => `goodbye ${name}`',
   '',
 ].join('\n')
 

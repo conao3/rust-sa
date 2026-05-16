@@ -1,5 +1,6 @@
 import { PatchDiff } from '@pierre/diffs/react'
 import type { ComponentProps } from 'react'
+import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
 
 export interface DiffViewProps {
   patch: string
@@ -13,6 +14,13 @@ export function DiffView({ patch, layout = 'unified', theme = 'light', className
     diffStyle: layout,
     theme: theme === 'dark' ? 'github-dark' : 'github-light',
   }
+  const files = splitPatchByFile(patch)
 
-  return <PatchDiff patch={patch} options={options} className={className} />
+  return (
+    <div className={className}>
+      {files.map((filePatch) => (
+        <PatchDiff key={pathFromPatch(filePatch)} patch={filePatch} options={options} />
+      ))}
+    </div>
+  )
 }
