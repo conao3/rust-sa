@@ -173,6 +173,12 @@ struct DiffParams {
     path: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct BlobParams {
+    rev: String,
+    path: String,
+}
+
 fn repo_root() -> PathBuf {
     gix::discover(".")
         .ok()
@@ -222,6 +228,34 @@ async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
         .into_response()
 }
 
+async fn blob_handler(AxumQuery(params): AxumQuery<BlobParams>) -> Response {
+    let target = format!("{}:{}", params.rev, params.path);
+    let output = match tokio::process::Command::new("git")
+        .current_dir(repo_root())
+        .args(["show", &target])
+        .output()
+        .await
+    {
+        Ok(o) => o,
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, format!("git failed: {e}")).into_response()
+        }
+    };
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return (
+            StatusCode::NOT_FOUND,
+            format!("git show {target}: {stderr}"),
+        )
+            .into_response();
+    }
+    (
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        output.stdout,
+    )
+        .into_response()
+}
+
 async fn events_handler(
     Extension(tx): Extension<broadcast::Sender<String>>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
@@ -237,6 +271,7 @@ fn build_router(schema: AppSchema, tx: broadcast::Sender<String>) -> Router {
     Router::new()
         .route("/api/graphql", post(graphql_handler))
         .route("/api/diff", get(diff_handler))
+        .route("/api/blob", get(blob_handler))
         .route("/api/events", get(events_handler))
         .layer(Extension(schema))
         .layer(Extension(tx))
@@ -297,6 +332,7 @@ async fn main() {
     let listener = TcpListener::bind(addr).await.unwrap();
     println!("graphql at  http://{addr}/api/graphql");
     println!("diff text   http://{addr}/api/diff?rev=HEAD");
+    println!("blob text   http://{addr}/api/blob?rev=HEAD&path=README.md");
     println!("sse events  http://{addr}/api/events");
     axum::serve(listener, app).await.unwrap();
 }
