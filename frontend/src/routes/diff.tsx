@@ -6,8 +6,10 @@ import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
+import { ViewedCheck } from '#/components/ui/viewed-check'
 import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { useViewed } from '#/lib/viewed'
 
 export const Route = createFileRoute('/diff')({
   component: DiffPage,
@@ -32,11 +34,14 @@ function DiffPage() {
   useRootAttribute('data-theme', theme)
   useRootAttribute('data-density', density)
 
+  const rev = 'HEAD'
   const { data, loading, error } = useQuery<{ diff: string }>(DIFF_QUERY, {
-    variables: { rev: 'HEAD' },
+    variables: { rev },
   })
   const patch = data?.diff ?? ''
   const paths = useMemo(() => splitPatchByFile(patch).map(pathFromPatch), [patch])
+  const { isViewed, toggle } = useViewed(rev)
+  const viewedCount = paths.filter((p) => isViewed(p)).length
 
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
@@ -49,7 +54,7 @@ function DiffPage() {
         onThemeChange={setTheme}
         view={view}
         onViewChange={setView}
-        viewedCount={0}
+        viewedCount={viewedCount}
         totalCount={paths.length}
         onHelp={() => setHelpOpen(true)}
         isLive
@@ -67,7 +72,19 @@ function DiffPage() {
               {error.message}
             </div>
           )}
-          {!loading && !error && <DiffView patch={patch} layout={mode} theme={theme} />}
+          {!loading && !error && (
+            <DiffView
+              patch={patch}
+              layout={mode}
+              theme={theme}
+              renderHeaderMetadata={(file) => (
+                <ViewedCheck
+                  isOn={isViewed(file.name)}
+                  onToggle={() => toggle(file.name)}
+                />
+              )}
+            />
+          )}
         </main>
       </div>
       <HelpSheet isOpen={helpOpen} onOpenChange={setHelpOpen} />
