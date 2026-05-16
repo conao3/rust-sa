@@ -7,8 +7,6 @@
     treefmt-nix.url = "github:numtide/treefmt-nix";
     rust-overlay.url = "github:oxalica/rust-overlay";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    devo.url = "github:conao3/rust-devo";
-    devo.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -55,24 +53,33 @@
             ];
           };
 
+          gstPlugins = with pkgs.gst_all_1; [
+            gstreamer
+            gst-plugins-base
+            gst-plugins-good
+            gst-plugins-bad
+            gst-libav
+          ];
+
           tauriBuildInputs =
             with pkgs;
-            lib.optionals stdenv.isLinux [
-              webkitgtk_4_1
-              gtk3
-              gdk-pixbuf
-              glib
-              librsvg
-              libayatana-appindicator
-              libappindicator-gtk3
-              pkg-config
-              openssl
-              dbus
-              libsoup_3
-            ]
+            lib.optionals stdenv.isLinux (
+              [
+                webkitgtk_4_1
+                gtk3
+                gdk-pixbuf
+                glib
+                librsvg
+                libayatana-appindicator
+                libappindicator-gtk3
+                pkg-config
+                openssl
+                dbus
+                libsoup_3
+              ]
+              ++ gstPlugins
+            )
             ++ lib.optionals stdenv.isDarwin [ ];
-
-          devo = inputs.devo.packages.${system}.default;
 
           branchSlug = pkgs.writeShellScript "branch-slug" ''
             set -euo pipefail -o posix
@@ -92,38 +99,6 @@
             programs.nixfmt.enable = true;
           };
 
-          apps = {
-            dev = {
-              type = "app";
-              program = toString (
-                pkgs.writeShellScript "dev-start" ''
-                  set -euo pipefail -o posix
-
-                  export PROJECT_ROOT="$PWD"
-                  export SLUG=$(${branchSlug})
-                  export FLAKE_REF="path:${toString ./.}"
-                  export RUST_LOG="''${RUST_LOG:-info}"
-
-                  exec ${devo}/bin/devo run --attach -f ./devo.yaml
-                ''
-              );
-            };
-
-            dev-stop = {
-              type = "app";
-              program = toString (
-                pkgs.writeShellScript "dev-stop" ''
-                  set -euo pipefail -o posix
-
-                  export PROJECT_ROOT="$PWD"
-                  export FLAKE_REF="path:${toString ./.}"
-
-                  ${devo}/bin/devo stop -f ./devo.yaml || true
-                ''
-              );
-            };
-          };
-
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
               rustToolchain
@@ -137,6 +112,7 @@
             shellHook = ''
               export RUST_LOG=info
               export TAURI_DEV_HOST=127.0.0.1
+              export GST_PLUGIN_SYSTEM_PATH_1_0="${pkgs.lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
             '';
           };
         };

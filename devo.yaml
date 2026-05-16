@@ -1,4 +1,4 @@
-session: rust-sa-$SLUG
+session: rust-sa${SLUG:+-$SLUG}
 
 inherit_env:
   - PROJECT_ROOT
@@ -6,11 +6,11 @@ inherit_env:
   - RUST_LOG
   - SLUG
 
-hook_session_closed: "cd $PROJECT_ROOT && nix run $FLAKE_REF#dev-stop"
+hook_session_closed: "cd ${PROJECT_ROOT:-$PWD} && nix run ${FLAKE_REF:-.}#dev-stop"
 
 tasks:
   - id: backend
-    cmd: nix develop $FLAKE_REF -c make -C src-tauri dev
+    cmd: make -C src-tauri dev
 
   - id: frontend
-    cmd: nix develop $FLAKE_REF -c make -C frontend dev
+    cmd: make -C frontend dev

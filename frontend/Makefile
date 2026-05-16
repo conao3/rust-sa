@@ -1,6 +1,6 @@
 .PHONY: dev
 dev:
-	pnpm dev
+	portless sa pnpm dev
 
 .PHONY: build
 build:
