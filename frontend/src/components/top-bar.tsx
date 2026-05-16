@@ -5,6 +5,7 @@ import { Segmented, SegmentedItem } from '#/components/ui/segmented'
 
 export type Mode = 'unified' | 'split'
 export type Theme = 'light' | 'dark'
+export type View = 'diff' | 'graph'
 
 export interface TopBarProps {
   base: string
@@ -14,9 +15,61 @@ export interface TopBarProps {
   onModeChange: (mode: Mode) => void
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  view: View
+  onViewChange: (view: View) => void
+  viewedCount: number
+  totalCount: number
   onHelp: () => void
   isLive?: boolean
   right?: ReactNode
+}
+
+function ViewedProgress({ count, total }: { count: number; total: number }) {
+  const pct = total === 0 ? 0 : Math.round((count / total) * 100)
+  return (
+    <div
+      className="flex items-center gap-2 font-mono text-[11.5px] text-mute"
+      title={`${count} / ${total} files viewed`}
+    >
+      <span className="text-ink">
+        {count}/{total}
+      </span>
+      <div className="relative w-[100px] h-[5px] bg-bg-card rounded-full overflow-hidden">
+        <i
+          className="absolute top-0 left-0 bottom-0 bg-moss transition-[width] duration-200"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span>{pct}%</span>
+    </div>
+  )
+}
+
+function ViewTabs({ value, onChange }: { value: View; onChange: (v: View) => void }) {
+  const tabs: View[] = ['diff', 'graph']
+  return (
+    <div className="inline-flex pl-3 ml-2 border-l border-hairline">
+      {tabs.map((tab) => {
+        const active = tab === value
+        return (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onChange(tab)}
+            className={
+              'relative border-0 bg-transparent font-mono text-[11.5px] py-2 px-3 cursor-pointer tracking-[0.02em] ' +
+              (active ? 'text-ink' : 'text-mute')
+            }
+          >
+            {tab}
+            {active && (
+              <span className="absolute left-2 right-2 -bottom-px h-[2px] bg-rust" />
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function BrandMark() {
@@ -37,6 +90,10 @@ export function TopBar({
   onModeChange,
   theme,
   onThemeChange,
+  view,
+  onViewChange,
+  viewedCount,
+  totalCount,
   onHelp,
   isLive,
   right,
@@ -61,8 +118,11 @@ export function TopBar({
         </span>
       )}
 
+      <ViewedProgress count={viewedCount} total={totalCount} />
+
       <div className="ml-auto flex items-center gap-3">
         {right}
+        <ViewTabs value={view} onChange={onViewChange} />
         <Segmented
           aria-label="View mode"
           selectedKeys={[mode]}

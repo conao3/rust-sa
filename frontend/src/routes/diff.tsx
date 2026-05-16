@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
-import { TopBar, type Mode, type Theme } from '#/components/top-bar'
+import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 
@@ -26,6 +26,7 @@ function DiffPage() {
     'rust-sa:density',
     'regular',
   )
+  const [view, setView] = useState<View>('diff')
   const [helpOpen, setHelpOpen] = useState(false)
 
   useRootAttribute('data-theme', theme)
@@ -46,6 +47,10 @@ function DiffPage() {
         onModeChange={setMode}
         theme={theme}
         onThemeChange={setTheme}
+        view={view}
+        onViewChange={setView}
+        viewedCount={0}
+        totalCount={paths.length}
         onHelp={() => setHelpOpen(true)}
         isLive
       />
