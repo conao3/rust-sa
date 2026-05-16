@@ -9,6 +9,16 @@ export interface FileTreeViewProps {
   search?: boolean
 }
 
+const THEME_STYLE: CSSProperties = {
+  height: '100%',
+  ['--trees-bg-override' as string]: 'var(--bg-soft)',
+  ['--trees-fg-override' as string]: 'var(--ink)',
+  ['--trees-border-color-override' as string]: 'var(--hairline)',
+  ['--trees-selected-bg-override' as string]: 'var(--bg-strong)',
+  ['--trees-hover-bg-override' as string]: 'var(--bg-card)',
+  ['--trees-muted-fg-override' as string]: 'var(--mute)',
+}
+
 export function FileTreeView({
   paths,
   header,
@@ -31,7 +41,7 @@ export function FileTreeView({
       model={model}
       header={header}
       renderContextMenu={renderContextMenu}
-      style={{ height: '100%', ...style }}
+      style={{ ...THEME_STYLE, ...style }}
     />
   )
 }
