@@ -7,6 +7,8 @@ import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
+import { CommentThread } from '#/components/comment-thread'
+import { useComments, type Comment } from '#/lib/comments'
 import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useViewed } from '#/lib/viewed'
@@ -54,6 +56,12 @@ function DiffPage() {
   const paths = useMemo(() => fileEntries.map((f) => f.path), [fileEntries])
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
+  const { comments } = useComments(rev)
+
+  const lineAnnotationsFor = (path: string) =>
+    comments
+      .filter((c) => c.path === path)
+      .map((c) => ({ side: c.side, lineNumber: c.lineNumber, metadata: { comment: c } }))
 
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
@@ -99,6 +107,11 @@ function DiffPage() {
                   onToggle={() => toggle(file.name)}
                 />
               )}
+              lineAnnotationsFor={lineAnnotationsFor}
+              renderAnnotation={(ann) => {
+                const a = ann as { metadata: { comment: Comment } }
+                return <CommentThread comments={[a.metadata.comment]} />
+              }}
             />
           )}
         </main>

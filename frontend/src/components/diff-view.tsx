@@ -1,8 +1,10 @@
 import { PatchDiff } from '@pierre/diffs/react'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
 
-type RenderHeaderMetadata = ComponentProps<typeof PatchDiff>['renderHeaderMetadata']
+type PatchDiffProps = ComponentProps<typeof PatchDiff>
+type RenderHeaderMetadata = PatchDiffProps['renderHeaderMetadata']
+type LineAnnotations = PatchDiffProps['lineAnnotations']
 
 export interface DiffViewProps {
   patch: string
@@ -10,6 +12,8 @@ export interface DiffViewProps {
   theme?: 'light' | 'dark'
   className?: string
   renderHeaderMetadata?: RenderHeaderMetadata
+  lineAnnotationsFor?: (path: string) => LineAnnotations
+  renderAnnotation?: (annotation: unknown) => ReactNode
 }
 
 export function DiffView({
@@ -18,8 +22,10 @@ export function DiffView({
   theme = 'light',
   className,
   renderHeaderMetadata,
+  lineAnnotationsFor,
+  renderAnnotation,
 }: DiffViewProps) {
-  const options: ComponentProps<typeof PatchDiff>['options'] = {
+  const options: PatchDiffProps['options'] = {
     diffStyle: layout,
     theme: theme === 'dark' ? 'github-dark' : 'github-light',
   }
@@ -27,14 +33,19 @@ export function DiffView({
 
   return (
     <div className={className}>
-      {files.map((filePatch) => (
-        <PatchDiff
-          key={pathFromPatch(filePatch)}
-          patch={filePatch}
-          options={options}
-          renderHeaderMetadata={renderHeaderMetadata}
-        />
-      ))}
+      {files.map((filePatch) => {
+        const path = pathFromPatch(filePatch)
+        return (
+          <PatchDiff
+            key={path}
+            patch={filePatch}
+            options={options}
+            renderHeaderMetadata={renderHeaderMetadata}
+            lineAnnotations={lineAnnotationsFor?.(path)}
+            renderAnnotation={renderAnnotation as PatchDiffProps['renderAnnotation']}
+          />
+        )
+      })}
     </div>
   )
 }
