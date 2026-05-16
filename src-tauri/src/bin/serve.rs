@@ -10,7 +10,14 @@ use axum::{
 use futures::stream::Stream;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
 use serde::Deserialize;
-use std::{convert::Infallible, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{Mutex, OnceLock},
+    time::Duration,
+};
 use tokio::{net::TcpListener, sync::broadcast};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tower_http::{compression::CompressionLayer, cors::{Any, CorsLayer}};
@@ -186,10 +193,6 @@ struct BlobParams {
     repo: String,
 }
 
-fn watch_root_from_env() -> Option<PathBuf> {
-    std::env::var("RUST_SA_REPO").ok().map(PathBuf::from)
-}
-
 fn normalize_renamed_path(raw: &str) -> String {
     if let (Some(open), Some(close)) = (raw.find('{'), raw.rfind('}')) {
         if open < close {
@@ -278,9 +281,32 @@ async fn blob_handler(AxumQuery(params): AxumQuery<BlobParams>) -> Response {
         .into_response()
 }
 
+#[derive(Deserialize)]
+struct EventsParams {
+    repo: String,
+}
+
+fn watchers() -> &'static Mutex<HashMap<PathBuf, broadcast::Sender<String>>> {
+    static WATCHERS: OnceLock<Mutex<HashMap<PathBuf, broadcast::Sender<String>>>> = OnceLock::new();
+    WATCHERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn ensure_watcher(repo: PathBuf) -> broadcast::Sender<String> {
+    let mut map = watchers().lock().unwrap();
+    if let Some(tx) = map.get(&repo) {
+        return tx.clone();
+    }
+    let (tx, _) = broadcast::channel::<String>(32);
+    let debouncer = spawn_watcher(tx.clone(), repo.clone());
+    Box::leak(Box::new(debouncer));
+    map.insert(repo, tx.clone());
+    tx
+}
+
 async fn events_handler(
-    Extension(tx): Extension<broadcast::Sender<String>>,
+    AxumQuery(p): AxumQuery<EventsParams>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let tx = ensure_watcher(PathBuf::from(&p.repo));
     let rx = tx.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|msg| match msg {
         Ok(payload) => Some(Ok(Event::default().data(payload))),
@@ -289,14 +315,13 @@ async fn events_handler(
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
 }
 
-fn build_router(schema: AppSchema, tx: broadcast::Sender<String>) -> Router {
+fn build_router(schema: AppSchema) -> Router {
     Router::new()
         .route("/api/graphql", post(graphql_handler))
         .route("/api/diff", get(diff_handler))
         .route("/api/blob", get(blob_handler))
         .route("/api/events", get(events_handler))
         .layer(Extension(schema))
-        .layer(Extension(tx))
         .layer(CompressionLayer::new().gzip(true))
         .layer(
             CorsLayer::new()
@@ -346,9 +371,7 @@ fn spawn_watcher(
 #[tokio::main]
 async fn main() {
     let schema = Schema::build(Query, EmptyMutation, EmptySubscription).finish();
-    let (tx, _rx) = broadcast::channel::<String>(32);
-    let _watcher = watch_root_from_env().map(|root| spawn_watcher(tx.clone(), root));
-    let app = build_router(schema, tx);
+    let app = build_router(schema);
     let addr: SocketAddr = "127.0.0.1:4000".parse().unwrap();
     let listener = TcpListener::bind(addr).await.unwrap();
     println!("graphql at  http://{addr}/api/graphql");

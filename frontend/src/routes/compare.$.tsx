@@ -118,7 +118,7 @@ function ComparePage() {
   })
   const liveFiles = refreshKey === 0 ? files : data?.files ?? files
   const [livePulse, setLivePulse] = useState(false)
-  useSSE(`${API_ORIGIN}/api/events`, () => {
+  useSSE(`${API_ORIGIN}/api/events?repo=${encodeURIComponent(repo)}`, () => {
     setRefreshKey((k) => k + 1)
     refetch()
     setLivePulse(true)
