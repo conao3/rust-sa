@@ -44,21 +44,26 @@ type Density = 'compact' | 'regular' | 'comfy'
 const DENSITIES: Density[] = ['compact', 'regular', 'comfy']
 const nextDensity = (d: Density): Density => DENSITIES[(DENSITIES.indexOf(d) + 1) % DENSITIES.length]
 
-interface DiffSearch {
-  rev?: string
-}
-
 interface LoaderData {
   rev: string
   files: FileEntry[]
 }
 
-export const Route = createFileRoute('/diff')({
-  validateSearch: (search: Record<string, unknown>): DiffSearch => ({
-    rev: typeof search.rev === 'string' ? search.rev : undefined,
-  }),
-  loaderDeps: ({ search }) => ({ rev: search.rev ?? 'HEAD' }),
-  loader: async ({ deps: { rev } }): Promise<LoaderData> => {
+function parseSpec(spec: string): { base: string; head: string; separator: '··' | '···' | null } {
+  if (spec.includes('...')) {
+    const [base, head] = spec.split('...', 2)
+    return { base, head, separator: '···' }
+  }
+  if (spec.includes('..')) {
+    const [base, head] = spec.split('..', 2)
+    return { base, head, separator: '··' }
+  }
+  return { base: spec, head: spec, separator: null }
+}
+
+export const Route = createFileRoute('/compare/$')({
+  loader: async ({ params }): Promise<LoaderData> => {
+    const rev = params._splat ?? 'HEAD'
     const { SERVER_ORIGIN } = await import('#/lib/server-origin')
     const res = await fetch(`${SERVER_ORIGIN}/api/graphql`, {
       method: 'POST',
@@ -72,10 +77,10 @@ export const Route = createFileRoute('/diff')({
     const json = (await res.json()) as { data?: { files?: FileEntry[] } }
     return { rev, files: json.data?.files ?? [] }
   },
-  component: DiffPage,
+  component: ComparePage,
 })
 
-function DiffPage() {
+function ComparePage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
@@ -115,6 +120,7 @@ function DiffPage() {
   const { comments, add: addComment, remove: removeComment } = useComments(rev)
 
   const currentPath = paths[focusedIndex] ?? paths[0]
+  const { base, head, separator } = parseSpec(rev)
 
   useKeybindings({
     '?': () => setHelpOpen((o) => !o),
@@ -129,9 +135,9 @@ function DiffPage() {
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
-        base={rev.split('..')[0] || rev}
-        head={rev.includes('..') ? rev.split('..').slice(-1)[0] : rev}
-        separator={rev.includes('...') ? '···' : '··'}
+        base={base}
+        head={separator ? head : base}
+        separator={separator ?? '··'}
         mode={mode}
         onModeChange={setMode}
         theme={theme}

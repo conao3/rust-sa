@@ -68,13 +68,13 @@ function GraphPage() {
   }
 
   const onViewChange = (next: View) => {
-    if (next === 'diff') navigate({ to: '/diff' })
+    if (next === 'diff') navigate({ to: '/compare/$', params: { _splat: 'HEAD' } })
   }
 
   const openDiff = () => {
     if (!base) return
-    const rev = head ? `${base}${threeDot ? '...' : '..'}${head}` : base
-    navigate({ to: '/diff', search: { rev } })
+    const spec = head ? `${base}${threeDot ? '...' : '..'}${head}` : base
+    navigate({ to: '/compare/$', params: { _splat: spec } })
   }
 
   return (
