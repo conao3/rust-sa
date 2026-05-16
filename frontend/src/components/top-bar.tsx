@@ -4,6 +4,7 @@ import { Button } from '#/components/ui/button'
 import { Segmented, SegmentedItem } from '#/components/ui/segmented'
 
 export type Mode = 'unified' | 'split'
+export type Theme = 'light' | 'dark'
 
 export interface TopBarProps {
   base: string
@@ -11,6 +12,8 @@ export interface TopBarProps {
   separator?: '··' | '···'
   mode: Mode
   onModeChange: (mode: Mode) => void
+  theme: Theme
+  onThemeChange: (theme: Theme) => void
   onHelp: () => void
   isLive?: boolean
   right?: ReactNode
@@ -32,6 +35,8 @@ export function TopBar({
   separator = '···',
   mode,
   onModeChange,
+  theme,
+  onThemeChange,
   onHelp,
   isLive,
   right,
@@ -68,6 +73,17 @@ export function TopBar({
         >
           <SegmentedItem id="unified">unified</SegmentedItem>
           <SegmentedItem id="split">split</SegmentedItem>
+        </Segmented>
+        <Segmented
+          aria-label="Theme"
+          selectedKeys={[theme]}
+          onSelectionChange={(keys) => {
+            const first = [...keys][0]
+            if (first === 'light' || first === 'dark') onThemeChange(first)
+          }}
+        >
+          <SegmentedItem id="light">light</SegmentedItem>
+          <SegmentedItem id="dark">dark</SegmentedItem>
         </Segmented>
         <Button
           variant="ghost"

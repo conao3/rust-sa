@@ -5,8 +5,9 @@ import { useMemo, useState } from 'react'
 import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
-import { TopBar, type Mode } from '#/components/top-bar'
+import { TopBar, type Mode, type Theme } from '#/components/top-bar'
 import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
+import { usePreference, useRootAttribute } from '#/lib/preference'
 
 export const Route = createFileRoute('/diff')({
   component: DiffPage,
@@ -19,8 +20,16 @@ const DIFF_QUERY = gql`
 `
 
 function DiffPage() {
-  const [mode, setMode] = useState<Mode>('unified')
+  const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
+  const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
+  const [density] = usePreference<'compact' | 'regular' | 'comfy'>(
+    'rust-sa:density',
+    'regular',
+  )
   const [helpOpen, setHelpOpen] = useState(false)
+
+  useRootAttribute('data-theme', theme)
+  useRootAttribute('data-density', density)
 
   const { data, loading, error } = useQuery<{ diff: string }>(DIFF_QUERY, {
     variables: { rev: 'HEAD' },
@@ -35,6 +44,8 @@ function DiffPage() {
         head="working"
         mode={mode}
         onModeChange={setMode}
+        theme={theme}
+        onThemeChange={setTheme}
         onHelp={() => setHelpOpen(true)}
         isLive
       />
@@ -51,7 +62,7 @@ function DiffPage() {
               {error.message}
             </div>
           )}
-          {!loading && !error && <DiffView patch={patch} layout={mode} />}
+          {!loading && !error && <DiffView patch={patch} layout={mode} theme={theme} />}
         </main>
       </div>
       <HelpSheet isOpen={helpOpen} onOpenChange={setHelpOpen} />
