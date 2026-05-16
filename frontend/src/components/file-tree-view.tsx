@@ -1,5 +1,5 @@
 import { FileTree, useFileTree } from '@pierre/trees/react'
-import type { ComponentProps, CSSProperties, ReactNode } from 'react'
+import { useEffect, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 
 export interface FileTreeViewProps {
   paths: string[]
@@ -21,6 +21,10 @@ export function FileTreeView({
     paths,
     search,
   })
+
+  useEffect(() => {
+    model.resetPaths(paths)
+  }, [model, paths])
 
   return (
     <FileTree
