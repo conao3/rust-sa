@@ -9,9 +9,14 @@ import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import { CommentThread } from '#/components/comment-thread'
 import { useComments, type Comment } from '#/lib/comments'
+import { useKeybindings } from '#/lib/keybindings'
 import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useViewed } from '#/lib/viewed'
+
+type Density = 'compact' | 'regular' | 'comfy'
+const DENSITIES: Density[] = ['compact', 'regular', 'comfy']
+const nextDensity = (d: Density): Density => DENSITIES[(DENSITIES.indexOf(d) + 1) % DENSITIES.length]
 
 export const Route = createFileRoute('/diff')({
   component: DiffPage,
@@ -27,11 +32,9 @@ function DiffPage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
-  const [density] = usePreference<'compact' | 'regular' | 'comfy'>(
-    'rust-sa:density',
-    'regular',
-  )
+  const [density, setDensity] = usePreference<Density>('rust-sa:density', 'regular')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState(0)
 
   useRootAttribute('data-theme', theme)
   useRootAttribute('data-density', density)
@@ -57,6 +60,18 @@ function DiffPage() {
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
   const { comments } = useComments(rev)
+
+  const currentPath = paths[focusedIndex] ?? paths[0]
+
+  useKeybindings({
+    '?': () => setHelpOpen((o) => !o),
+    s: () => setMode(mode === 'unified' ? 'split' : 'unified'),
+    '.': () => setDensity(nextDensity(density)),
+    v: () => currentPath && toggle(currentPath),
+    ']': () => paths.length && setFocusedIndex((i) => Math.min(i + 1, paths.length - 1)),
+    '[': () => paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)),
+    g: () => navigate({ to: '/graph' }),
+  })
 
   const lineAnnotationsFor = (path: string) =>
     comments
