@@ -25,6 +25,14 @@ struct Commit {
     refs: String,
 }
 
+#[derive(SimpleObject)]
+struct FileEntry {
+    path: String,
+    status: String,
+    additions: i32,
+    deletions: i32,
+}
+
 struct Query;
 
 #[Object]
@@ -40,6 +48,79 @@ impl Query {
             .workdir()
             .ok_or_else(|| async_graphql::Error::new("bare repository has no workdir"))?;
         Ok(workdir.to_string_lossy().into_owned())
+    }
+
+    async fn files(&self, rev: Option<String>) -> async_graphql::Result<Vec<FileEntry>> {
+        let rev = rev.unwrap_or_else(|| "HEAD".to_string());
+        let is_range = rev.contains("..");
+        let (subcmd, extra): (&str, Vec<String>) = if is_range {
+            ("diff", vec![rev.clone()])
+        } else {
+            ("show", vec!["--format=".into(), rev.clone()])
+        };
+
+        let mut numstat_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--numstat".into()];
+        numstat_args.extend(extra.clone());
+        let mut status_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--name-status".into()];
+        status_args.extend(extra);
+
+        let (numstat, name_status) = tokio::join!(
+            tokio::process::Command::new("git").args(&numstat_args).output(),
+            tokio::process::Command::new("git").args(&status_args).output(),
+        );
+        let numstat = numstat.map_err(|e| async_graphql::Error::new(format!("git numstat: {e}")))?;
+        let name_status = name_status.map_err(|e| async_graphql::Error::new(format!("git name-status: {e}")))?;
+        if !numstat.status.success() || !name_status.status.success() {
+            return Err(async_graphql::Error::new(format!(
+                "git {rev}: {}",
+                String::from_utf8_lossy(&numstat.stderr)
+            )));
+        }
+
+        let mut entries: std::collections::BTreeMap<String, FileEntry> = std::collections::BTreeMap::new();
+        for line in String::from_utf8_lossy(&numstat.stdout).lines() {
+            let mut parts = line.splitn(3, '\t');
+            let add = parts.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
+            let del = parts.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
+            let path = match parts.next() {
+                Some(p) => p.to_string(),
+                None => continue,
+            };
+            entries.insert(
+                path.clone(),
+                FileEntry {
+                    path,
+                    status: "modified".into(),
+                    additions: add,
+                    deletions: del,
+                },
+            );
+        }
+        for line in String::from_utf8_lossy(&name_status.stdout).lines() {
+            let mut parts = line.splitn(2, '\t');
+            let code = parts.next().unwrap_or("");
+            let path = match parts.next() {
+                Some(p) => p.to_string(),
+                None => continue,
+            };
+            let status = match code.chars().next().unwrap_or(' ') {
+                'A' => "added",
+                'D' => "deleted",
+                'R' => "renamed",
+                'C' => "copied",
+                _ => "modified",
+            };
+            entries
+                .entry(path.clone())
+                .and_modify(|e| e.status = status.into())
+                .or_insert(FileEntry {
+                    path,
+                    status: status.into(),
+                    additions: 0,
+                    deletions: 0,
+                });
+        }
+        Ok(entries.into_values().collect())
     }
 
     async fn commits(&self, limit: Option<i32>) -> async_graphql::Result<Vec<Commit>> {
