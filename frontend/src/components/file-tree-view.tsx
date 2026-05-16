@@ -1,8 +1,10 @@
 import { FileTree, useFileTree } from '@pierre/trees/react'
+import type { GitStatusEntry } from '@pierre/trees'
 import { useEffect, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 
 export interface FileTreeViewProps {
   paths: string[]
+  gitStatus?: readonly GitStatusEntry[]
   header?: ReactNode
   renderContextMenu?: ComponentProps<typeof FileTree>['renderContextMenu']
   style?: CSSProperties
@@ -21,6 +23,7 @@ const THEME_STYLE: CSSProperties = {
 
 export function FileTreeView({
   paths,
+  gitStatus,
   header,
   renderContextMenu,
   style,
@@ -35,6 +38,10 @@ export function FileTreeView({
   useEffect(() => {
     model.resetPaths(paths)
   }, [model, paths])
+
+  useEffect(() => {
+    model.setGitStatus(gitStatus)
+  }, [model, gitStatus])
 
   return (
     <FileTree

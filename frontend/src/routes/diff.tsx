@@ -7,7 +7,7 @@ import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
-import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
+import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useViewed } from '#/lib/viewed'
 
@@ -39,7 +39,15 @@ function DiffPage() {
     variables: { rev },
   })
   const patch = data?.diff ?? ''
-  const paths = useMemo(() => splitPatchByFile(patch).map(pathFromPatch), [patch])
+  const fileEntries = useMemo(
+    () =>
+      splitPatchByFile(patch).map((p) => ({
+        path: pathFromPatch(p),
+        status: statusFromPatch(p),
+      })),
+    [patch],
+  )
+  const paths = useMemo(() => fileEntries.map((f) => f.path), [fileEntries])
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
 
@@ -61,7 +69,11 @@ function DiffPage() {
       />
       <div className="grid grid-cols-[var(--tree-w)_1fr] min-h-0 border-t border-hairline">
         <aside className="bg-bg-soft border-r border-hairline min-h-0 overflow-hidden">
-          <FileTreeView paths={paths} header={<TreeHeader count={paths.length} />} />
+          <FileTreeView
+            paths={paths}
+            gitStatus={fileEntries}
+            header={<TreeHeader count={paths.length} />}
+          />
         </aside>
         <main className="overflow-y-auto bg-bg min-w-0">
           {loading && (
