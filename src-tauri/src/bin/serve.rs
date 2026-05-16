@@ -65,8 +65,8 @@ impl Query {
         status_args.extend(extra);
 
         let (numstat, name_status) = tokio::join!(
-            tokio::process::Command::new("git").args(&numstat_args).output(),
-            tokio::process::Command::new("git").args(&status_args).output(),
+            tokio::process::Command::new("git").current_dir(repo_root()).args(&numstat_args).output(),
+            tokio::process::Command::new("git").current_dir(repo_root()).args(&status_args).output(),
         );
         let numstat = numstat.map_err(|e| async_graphql::Error::new(format!("git numstat: {e}")))?;
         let name_status = name_status.map_err(|e| async_graphql::Error::new(format!("git name-status: {e}")))?;
@@ -173,6 +173,13 @@ struct DiffParams {
     path: Option<String>,
 }
 
+fn repo_root() -> PathBuf {
+    gix::discover(".")
+        .ok()
+        .and_then(|r| r.workdir().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
 async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
     let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
     let mut args: Vec<String> = if rev.contains("..") {
@@ -189,7 +196,12 @@ async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
         args.push("--".into());
         args.push(p.clone());
     }
-    let output = match tokio::process::Command::new("git").args(&args).output().await {
+    let output = match tokio::process::Command::new("git")
+        .current_dir(repo_root())
+        .args(&args)
+        .output()
+        .await
+    {
         Ok(o) => o,
         Err(e) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, format!("git failed: {e}")).into_response()

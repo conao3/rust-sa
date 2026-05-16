@@ -1,3 +1,5 @@
+import { gql } from '@apollo/client'
+import { useQuery } from '@apollo/client/react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { DiffView } from '#/components/diff-view'
@@ -8,12 +10,35 @@ import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import { API_ORIGIN } from '#/lib/apollo'
 import { useComments } from '#/lib/comments'
-import { useDiff } from '#/lib/diff-api'
 import { useKeybindings } from '#/lib/keybindings'
-import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useSSE } from '#/lib/sse'
 import { useViewed } from '#/lib/viewed'
+
+import type { GitStatusEntry } from '@pierre/trees'
+
+interface FileEntry {
+  path: string
+  status: string
+  additions: number
+  deletions: number
+}
+
+function gitStatusKey(s: string): GitStatusEntry['status'] {
+  if (s === 'added' || s === 'deleted' || s === 'modified' || s === 'renamed') return s
+  return 'modified'
+}
+
+const FILES_QUERY = gql`
+  query Files($rev: String!) {
+    files(rev: $rev) {
+      path
+      status
+      additions
+      deletions
+    }
+  }
+`
 
 type Density = 'compact' | 'regular' | 'comfy'
 const DENSITIES: Density[] = ['compact', 'regular', 'comfy']
@@ -48,20 +73,20 @@ function DiffPage() {
   const search = Route.useSearch()
   const rev = search.rev ?? 'HEAD'
   const [refreshKey, setRefreshKey] = useState(0)
-  const { patch, loading, error } = useDiff(rev, refreshKey)
+  const { data, loading, error, refetch } = useQuery<{ files: FileEntry[] }>(FILES_QUERY, {
+    variables: { rev },
+  })
+  const files = data?.files ?? []
   const [livePulse, setLivePulse] = useState(false)
   useSSE(`${API_ORIGIN}/api/events`, () => {
     setRefreshKey((k) => k + 1)
+    refetch()
     setLivePulse(true)
     window.setTimeout(() => setLivePulse(false), 2500)
   })
   const fileEntries = useMemo(
-    () =>
-      splitPatchByFile(patch).map((p) => ({
-        path: pathFromPatch(p),
-        status: statusFromPatch(p),
-      })),
-    [patch],
+    () => files.map((f) => ({ path: f.path, status: gitStatusKey(f.status) })),
+    [files],
   )
   const paths = useMemo(() => fileEntries.map((f) => f.path), [fileEntries])
   const { isViewed, toggle } = useViewed(rev)
@@ -116,7 +141,9 @@ function DiffPage() {
           )}
           {!loading && !error && (
             <DiffView
-              patch={patch}
+              rev={rev}
+              refreshKey={refreshKey}
+              files={files}
               layout={mode}
               theme={theme}
               comments={comments}

@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState, type ComponentProps } from 'react'
 import { CommentComposer } from '#/components/comment-composer'
 import { CommentThread } from '#/components/comment-thread'
 import type { Comment, Side } from '#/lib/comments'
-import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
+import { useDiff } from '#/lib/diff-api'
 
 type PatchDiffProps = ComponentProps<typeof PatchDiff>
 type RenderHeaderMetadata = PatchDiffProps['renderHeaderMetadata']
@@ -14,8 +14,14 @@ interface SelectedLineRange {
   endSide?: Side
 }
 
+export interface DiffViewFile {
+  path: string
+}
+
 export interface DiffViewProps {
-  patch: string
+  rev: string
+  refreshKey: number
+  files: DiffViewFile[]
   layout?: 'unified' | 'split'
   theme?: 'light' | 'dark'
   className?: string
@@ -26,7 +32,9 @@ export interface DiffViewProps {
 }
 
 export function DiffView({
-  patch,
+  rev,
+  refreshKey,
+  files,
   layout = 'unified',
   theme = 'light',
   className,
@@ -35,16 +43,17 @@ export function DiffView({
   onAddComment,
   onDeleteComment,
 }: DiffViewProps) {
-  const files = splitPatchByFile(patch)
   return (
     <div className={className}>
-      {files.map((filePatch) => (
+      {files.map((f) => (
         <FileBlock
-          key={pathFromPatch(filePatch)}
-          filePatch={filePatch}
+          key={f.path}
+          rev={rev}
+          path={f.path}
+          refreshKey={refreshKey}
           layout={layout}
           theme={theme}
-          comments={comments?.filter((c) => c.path === pathFromPatch(filePatch))}
+          comments={comments?.filter((c) => c.path === f.path)}
           renderHeaderMetadata={renderHeaderMetadata}
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
@@ -55,7 +64,9 @@ export function DiffView({
 }
 
 interface FileBlockProps {
-  filePatch: string
+  rev: string
+  path: string
+  refreshKey: number
   layout: 'unified' | 'split'
   theme: 'light' | 'dark'
   comments?: Comment[]
@@ -65,7 +76,9 @@ interface FileBlockProps {
 }
 
 function FileBlock({
-  filePatch,
+  rev,
+  path,
+  refreshKey,
   layout,
   theme,
   comments = [],
@@ -73,7 +86,7 @@ function FileBlock({
   onAddComment,
   onDeleteComment,
 }: FileBlockProps) {
-  const path = pathFromPatch(filePatch)
+  const { patch, loading, error } = useDiff(rev, refreshKey, path)
   const [composing, setComposing] = useState<{ side: Side; lineNumber: number } | null>(null)
 
   const onGutterUtilityClick = useCallback(
@@ -152,9 +165,24 @@ function FileBlock({
     [composing, onAddComment, onDeleteComment, path],
   )
 
+  if (loading && !patch) {
+    return (
+      <div className="px-4 py-3 font-mono text-[12px] text-mute border-b border-hairline-soft">
+        {path} — loading…
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="px-4 py-3 font-mono text-[12px] text-crimson border-b border-hairline-soft">
+        {path} — {error.message}
+      </div>
+    )
+  }
+
   return (
     <PatchDiff
-      patch={filePatch}
+      patch={patch}
       options={options}
       lineAnnotations={annotations}
       renderHeaderMetadata={renderHeaderMetadata}

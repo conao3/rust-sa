@@ -13,13 +13,13 @@ export function diffUrl(rev: string, path?: string): string {
   return `${API_ORIGIN}/api/diff?${params.toString()}`
 }
 
-export function useDiff(rev: string, refreshKey: number = 0): DiffState {
+export function useDiff(rev: string, refreshKey: number = 0, path?: string): DiffState {
   const [state, setState] = useState<DiffState>({ patch: '', loading: true, error: null })
 
   useEffect(() => {
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
-    fetch(diffUrl(rev))
+    fetch(diffUrl(rev, path))
       .then(async (r) => {
         if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
         return r.text()
@@ -35,7 +35,7 @@ export function useDiff(rev: string, refreshKey: number = 0): DiffState {
     return () => {
       cancelled = true
     }
-  }, [rev, refreshKey])
+  }, [rev, refreshKey, path])
 
   return state
 }
