@@ -65,16 +65,16 @@ function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg text-ink">
-      <header className="border-b border-hairline">
-        <div className="max-w-4xl mx-auto px-8 h-[var(--topbar-h)] flex items-center gap-3">
+    <div className="min-h-screen bg-bg text-ink flex flex-col items-center">
+      <header className="w-full border-b border-hairline flex justify-center">
+        <div className="w-full max-w-4xl px-8 h-[var(--topbar-h)] flex items-center gap-3">
           <BrandMark />
           <span className="font-mono text-[13px] font-medium text-ink">rust-sa</span>
           <span className="ml-2 font-mono text-[11.5px] text-mute">local git diff reviewer</span>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-8 py-16 flex flex-col gap-16">
+      <main className="w-full max-w-4xl px-8 py-16 flex flex-col gap-16">
         <section className="flex flex-col gap-4">
           <h1 className="font-serif text-[56px] leading-none tracking-[-0.02em] font-normal m-0">
             Review your local diff.
@@ -189,8 +189,8 @@ function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-hairline mt-16">
-        <div className="max-w-4xl mx-auto px-8 py-6 font-mono text-[11px] text-mute flex items-center justify-between">
+      <footer className="w-full border-t border-hairline mt-16 flex justify-center">
+        <div className="w-full max-w-4xl px-8 py-6 font-mono text-[11px] text-mute flex items-center justify-between">
           <span>rust-sa · local git diff reviewer</span>
           <a
             href="https://github.com/conao3/rust-sa"
