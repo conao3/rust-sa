@@ -26,6 +26,7 @@
   --color-rust: var(--rust);
   --color-rust-deep: var(--rust-deep);
   --color-moss: var(--moss);
+  --color-moss-deep: var(--moss-deep);
   --color-crimson: var(--crimson);
   --color-amber: var(--amber);
 }
@@ -56,6 +57,7 @@
   --rust-deep: #7a3520;
   --rust-soft: rgba(160, 74, 42, 0.10);
   --moss: #4f7a6a;
+  --moss-deep: #2f4a40;
   --moss-soft: rgba(79, 122, 106, 0.16);
   --moss-strong: rgba(79, 122, 106, 0.32);
   --crimson: #a83a3a;

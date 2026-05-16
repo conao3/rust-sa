@@ -27,7 +27,7 @@ export function FileTreeView({
   header,
   renderContextMenu,
   style,
-  search = true,
+  search = false,
 }: FileTreeViewProps) {
   const { model } = useFileTree({
     initialExpansion: 'open',

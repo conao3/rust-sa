@@ -112,8 +112,8 @@ export function TopBar({
       </div>
 
       {isLive && (
-        <span className="inline-flex items-center gap-1.5 px-2 py-[3px] border border-moss text-moss rounded-[3px] text-[11px] tracking-[0.02em] flex-shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-moss" />
+        <span className="inline-flex items-center gap-1.5 px-2 py-[3px] bg-moss-deep text-[#f4efe6] rounded-[3px] text-[11px] tracking-[0.02em] flex-shrink-0 font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#f4efe6]" />
           live
         </span>
       )}
