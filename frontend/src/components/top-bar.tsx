@@ -76,7 +76,7 @@ export function TopBar({
           aria-label="Keybindings"
           className="w-7 px-0 justify-center"
         >
-          <HelpCircle size={14} />
+          <HelpCircle size={16} />
         </Button>
       </div>
     </header>
