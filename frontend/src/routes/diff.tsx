@@ -5,12 +5,14 @@ import { useMemo, useState } from 'react'
 import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
+import { LiveToast } from '#/components/live-toast'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import { useComments } from '#/lib/comments'
 import { useKeybindings } from '#/lib/keybindings'
 import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { useSSE } from '#/lib/sse'
 import { useViewed } from '#/lib/viewed'
 
 type Density = 'compact' | 'regular' | 'comfy'
@@ -51,8 +53,14 @@ function DiffPage() {
 
   const search = Route.useSearch()
   const rev = search.rev ?? 'HEAD'
-  const { data, loading, error } = useQuery<{ diff: string }>(DIFF_QUERY, {
+  const { data, loading, error, refetch } = useQuery<{ diff: string }>(DIFF_QUERY, {
     variables: { rev },
+  })
+  const [livePulse, setLivePulse] = useState(false)
+  useSSE('http://127.0.0.1:4000/events', () => {
+    refetch()
+    setLivePulse(true)
+    window.setTimeout(() => setLivePulse(false), 2500)
   })
   const patch = data?.diff ?? ''
   const fileEntries = useMemo(
@@ -135,6 +143,7 @@ function DiffPage() {
         </main>
       </div>
       <HelpSheet isOpen={helpOpen} onOpenChange={setHelpOpen} />
+      {livePulse && <LiveToast />}
     </div>
   )
 }

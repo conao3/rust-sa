@@ -1,8 +1,15 @@
 use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{routing::post, Extension, Router};
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
+use axum::{
+    response::sse::{Event, KeepAlive, Sse},
+    routing::{get, post},
+    Extension, Router,
+};
+use futures::stream::Stream;
+use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, time::Duration};
+use tokio::{net::TcpListener, sync::broadcast};
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tower_http::cors::{Any, CorsLayer};
 
 #[derive(SimpleObject)]
@@ -103,10 +110,23 @@ async fn graphql_handler(schema: Extension<AppSchema>, req: GraphQLRequest) -> G
     schema.execute(req.into_inner()).await.into()
 }
 
-fn build_router(schema: AppSchema) -> Router {
+async fn events_handler(
+    Extension(tx): Extension<broadcast::Sender<String>>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = tx.subscribe();
+    let stream = BroadcastStream::new(rx).filter_map(|msg| match msg {
+        Ok(payload) => Some(Ok(Event::default().data(payload))),
+        Err(_) => None,
+    });
+    Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
+}
+
+fn build_router(schema: AppSchema, tx: broadcast::Sender<String>) -> Router {
     Router::new()
         .route("/graphql", post(graphql_handler))
+        .route("/events", get(events_handler))
         .layer(Extension(schema))
+        .layer(Extension(tx))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -115,12 +135,53 @@ fn build_router(schema: AppSchema) -> Router {
         )
 }
 
+const IGNORED_SEGMENTS: &[&str] = &[
+    "/.git/",
+    "/target/",
+    "/node_modules/",
+    "/.tanstack/",
+    "/.output/",
+    "/.nitro/",
+    "/dist/",
+    "/.direnv/",
+];
+
+fn is_interesting(path: &std::path::Path) -> bool {
+    let p = path.to_string_lossy();
+    !IGNORED_SEGMENTS.iter().any(|seg| p.contains(seg))
+}
+
+fn spawn_watcher(tx: broadcast::Sender<String>) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
+    let watcher_tx = tx.clone();
+    let mut debouncer = new_debouncer(Duration::from_millis(250), move |res: DebounceEventResult| {
+        if let Ok(events) = res {
+            if events.iter().any(|e| is_interesting(&e.path)) {
+                let _ = watcher_tx.send("changed".to_string());
+            }
+        }
+    })
+    .expect("failed to create debouncer");
+    let root: PathBuf = gix::discover(".")
+        .ok()
+        .and_then(|r| r.workdir().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+    if let Err(e) = debouncer.watcher().watch(&root, RecursiveMode::Recursive) {
+        eprintln!("watch failed for {}: {e}", root.display());
+    } else {
+        eprintln!("watching {}", root.display());
+    }
+    debouncer
+}
+
 #[tokio::main]
 async fn main() {
     let schema = Schema::build(Query, EmptyMutation, EmptySubscription).finish();
-    let app = build_router(schema);
+    let (tx, _rx) = broadcast::channel::<String>(32);
+    let _watcher = spawn_watcher(tx.clone());
+    let app = build_router(schema, tx);
     let addr: SocketAddr = "127.0.0.1:4000".parse().unwrap();
     let listener = TcpListener::bind(addr).await.unwrap();
     println!("graphql server listening on http://{addr}/graphql");
+    println!("sse events on http://{addr}/events");
     axum::serve(listener, app).await.unwrap();
 }
