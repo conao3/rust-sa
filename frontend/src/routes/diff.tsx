@@ -7,8 +7,7 @@ import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
-import { CommentThread } from '#/components/comment-thread'
-import { useComments, type Comment } from '#/lib/comments'
+import { useComments } from '#/lib/comments'
 import { useKeybindings } from '#/lib/keybindings'
 import { pathFromPatch, splitPatchByFile, statusFromPatch } from '#/lib/parse-patch'
 import { usePreference, useRootAttribute } from '#/lib/preference'
@@ -59,7 +58,7 @@ function DiffPage() {
   const paths = useMemo(() => fileEntries.map((f) => f.path), [fileEntries])
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
-  const { comments } = useComments(rev)
+  const { comments, add: addComment, remove: removeComment } = useComments(rev)
 
   const currentPath = paths[focusedIndex] ?? paths[0]
 
@@ -72,11 +71,6 @@ function DiffPage() {
     '[': () => paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)),
     g: () => navigate({ to: '/graph' }),
   })
-
-  const lineAnnotationsFor = (path: string) =>
-    comments
-      .filter((c) => c.path === path)
-      .map((c) => ({ side: c.side, lineNumber: c.lineNumber, metadata: { comment: c } }))
 
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
@@ -116,17 +110,17 @@ function DiffPage() {
               patch={patch}
               layout={mode}
               theme={theme}
+              comments={comments}
               renderHeaderMetadata={(file) => (
                 <ViewedCheck
                   isOn={isViewed(file.name)}
                   onToggle={() => toggle(file.name)}
                 />
               )}
-              lineAnnotationsFor={lineAnnotationsFor}
-              renderAnnotation={(ann) => {
-                const a = ann as { metadata: { comment: Comment } }
-                return <CommentThread comments={[a.metadata.comment]} />
-              }}
+              onAddComment={(input) =>
+                addComment({ ...input, author: 'you' })
+              }
+              onDeleteComment={removeComment}
             />
           )}
         </main>

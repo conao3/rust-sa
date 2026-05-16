@@ -1,19 +1,28 @@
 import { PatchDiff } from '@pierre/diffs/react'
-import type { ComponentProps, ReactNode } from 'react'
+import { useState, type ComponentProps, type ReactElement } from 'react'
+import { CommentComposer } from '#/components/comment-composer'
+import { CommentThread } from '#/components/comment-thread'
+import type { Comment, Side } from '#/lib/comments'
 import { pathFromPatch, splitPatchByFile } from '#/lib/parse-patch'
 
 type PatchDiffProps = ComponentProps<typeof PatchDiff>
 type RenderHeaderMetadata = PatchDiffProps['renderHeaderMetadata']
-type LineAnnotations = PatchDiffProps['lineAnnotations']
+interface SelectedLineRange {
+  start: number
+  end: number
+  side?: Side
+  endSide?: Side
+}
 
 export interface DiffViewProps {
   patch: string
   layout?: 'unified' | 'split'
   theme?: 'light' | 'dark'
   className?: string
+  comments?: Comment[]
   renderHeaderMetadata?: RenderHeaderMetadata
-  lineAnnotationsFor?: (path: string) => LineAnnotations
-  renderAnnotation?: (annotation: unknown) => ReactNode
+  onAddComment?: (input: { path: string; side: Side; lineNumber: number; body: string }) => void
+  onDeleteComment?: (id: string) => void
 }
 
 export function DiffView({
@@ -21,31 +30,122 @@ export function DiffView({
   layout = 'unified',
   theme = 'light',
   className,
+  comments,
   renderHeaderMetadata,
-  lineAnnotationsFor,
-  renderAnnotation,
+  onAddComment,
+  onDeleteComment,
 }: DiffViewProps) {
+  const files = splitPatchByFile(patch)
+  return (
+    <div className={className}>
+      {files.map((filePatch) => (
+        <FileBlock
+          key={pathFromPatch(filePatch)}
+          filePatch={filePatch}
+          layout={layout}
+          theme={theme}
+          comments={comments?.filter((c) => c.path === pathFromPatch(filePatch))}
+          renderHeaderMetadata={renderHeaderMetadata}
+          onAddComment={onAddComment}
+          onDeleteComment={onDeleteComment}
+        />
+      ))}
+    </div>
+  )
+}
+
+interface FileBlockProps {
+  filePatch: string
+  layout: 'unified' | 'split'
+  theme: 'light' | 'dark'
+  comments?: Comment[]
+  renderHeaderMetadata?: RenderHeaderMetadata
+  onAddComment?: (input: { path: string; side: Side; lineNumber: number; body: string }) => void
+  onDeleteComment?: (id: string) => void
+}
+
+function FileBlock({
+  filePatch,
+  layout,
+  theme,
+  comments = [],
+  renderHeaderMetadata,
+  onAddComment,
+  onDeleteComment,
+}: FileBlockProps) {
+  const path = pathFromPatch(filePatch)
+  const [composing, setComposing] = useState<{ side: Side; lineNumber: number } | null>(null)
+
   const options: PatchDiffProps['options'] = {
     diffStyle: layout,
     theme: theme === 'dark' ? 'github-dark' : 'github-light',
+    enableGutterUtility: true,
+    onGutterUtilityClick: (range: SelectedLineRange) => {
+      if (!onAddComment) return
+      setComposing({ side: (range.side ?? 'additions') as Side, lineNumber: range.start })
+    },
   }
-  const files = splitPatchByFile(patch)
+
+  const groupedComments = new Map<string, Comment[]>()
+  for (const c of comments) {
+    const key = `${c.side}:${c.lineNumber}`
+    const arr = groupedComments.get(key) ?? []
+    arr.push(c)
+    groupedComments.set(key, arr)
+  }
+
+  const annotations = [
+    ...[...groupedComments.entries()].map(([key, list]) => {
+      const [side, ln] = key.split(':')
+      return {
+        side: side as Side,
+        lineNumber: Number(ln),
+        metadata: { kind: 'thread' as const, comments: list },
+      }
+    }),
+    ...(composing
+      ? [
+          {
+            side: composing.side,
+            lineNumber: composing.lineNumber,
+            metadata: { kind: 'composer' as const },
+          },
+        ]
+      : []),
+  ]
 
   return (
-    <div className={className}>
-      {files.map((filePatch) => {
-        const path = pathFromPatch(filePatch)
-        return (
-          <PatchDiff
-            key={path}
-            patch={filePatch}
-            options={options}
-            renderHeaderMetadata={renderHeaderMetadata}
-            lineAnnotations={lineAnnotationsFor?.(path)}
-            renderAnnotation={renderAnnotation as PatchDiffProps['renderAnnotation']}
-          />
-        )
-      })}
-    </div>
+    <PatchDiff
+      patch={filePatch}
+      options={options}
+      lineAnnotations={annotations}
+      renderHeaderMetadata={renderHeaderMetadata}
+      renderGutterUtility={() => '+' as unknown as ReactElement}
+      renderAnnotation={(ann) => {
+        const m = (ann as { metadata?: unknown }).metadata
+        if (!m || typeof m !== 'object') return null
+        if ((m as { kind: string }).kind === 'thread') {
+          const list = (m as { comments: Comment[] }).comments
+          return <CommentThread comments={list} onDelete={onDeleteComment} />
+        }
+        if ((m as { kind: string }).kind === 'composer' && composing) {
+          return (
+            <CommentComposer
+              onCancel={() => setComposing(null)}
+              onSubmit={(body) => {
+                onAddComment?.({
+                  path,
+                  side: composing.side,
+                  lineNumber: composing.lineNumber,
+                  body,
+                })
+                setComposing(null)
+              }}
+            />
+          )
+        }
+        return null
+      }}
+    />
   )
 }

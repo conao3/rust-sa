@@ -1,10 +1,16 @@
+import { Button } from '#/components/ui/button'
 import type { Comment } from '#/lib/comments'
 
 export interface CommentThreadProps {
   comments: Comment[]
+  onDelete?: (id: string) => void
 }
 
-export function CommentThread({ comments }: CommentThreadProps) {
+function promptFor(c: Comment): string {
+  return `Re: ${c.path}:${c.lineNumber}\n${c.body}`
+}
+
+export function CommentThread({ comments, onDelete }: CommentThreadProps) {
   if (comments.length === 0) return null
   return (
     <div className="bg-bg-soft border-y border-hairline-soft px-4 py-2.5 pl-[60px] font-sans text-[13px] flex flex-col gap-2">
@@ -24,6 +30,21 @@ export function CommentThread({ comments }: CommentThreadProps) {
           </div>
           <div className="text-[13.5px] leading-[1.5] text-ink-2 whitespace-pre-wrap">
             {c.body}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="flex-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => navigator.clipboard?.writeText(promptFor(c))}
+            >
+              copy prompt
+            </Button>
+            {onDelete && (
+              <Button variant="ghost" size="sm" onPress={() => onDelete(c.id)}>
+                delete
+              </Button>
+            )}
           </div>
         </div>
       ))}
