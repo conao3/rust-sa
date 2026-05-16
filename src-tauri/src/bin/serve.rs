@@ -23,6 +23,15 @@ impl Query {
         "ok".to_string()
     }
 
+    async fn repo_root(&self) -> async_graphql::Result<String> {
+        let repo = gix::discover(".")
+            .map_err(|e| async_graphql::Error::new(format!("gix discover: {e}")))?;
+        let workdir = repo
+            .workdir()
+            .ok_or_else(|| async_graphql::Error::new("bare repository has no workdir"))?;
+        Ok(workdir.to_string_lossy().into_owned())
+    }
+
     async fn diff(&self, rev: Option<String>) -> async_graphql::Result<String> {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
         let (cmd_name, args): (&str, Vec<String>) = if rev.contains("..") {
