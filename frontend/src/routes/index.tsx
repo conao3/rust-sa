@@ -74,20 +74,6 @@ function HomePage() {
     },
   })
 
-  const openGraph = () => {
-    const repo = form.state.values.repo.trim()
-    if (!repo) return
-    setRecents(pushRecent({ repo, visitedAt: new Date().toISOString() }))
-    navigate({ to: '/graph', search: { repo } })
-  }
-
-  const openDiff = () => {
-    const repo = form.state.values.repo.trim()
-    if (!repo) return
-    setRecents(pushRecent({ repo, visitedAt: new Date().toISOString() }))
-    navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
-  }
-
   return (
     <div className="min-h-screen bg-bg text-ink">
       <header className="border-b border-hairline">
@@ -149,24 +135,6 @@ function HomePage() {
                 </Field>
               )}
             </form.Field>
-            <form.Subscribe selector={(s) => s.values.repo.trim().length > 0}>
-              {(hasRepo) => (
-                <div className="flex items-center gap-2 mt-1">
-                  <Button type="submit" variant="primary" isDisabled={!hasRepo}>
-                    <Eye size={16} aria-hidden="true" />
-                    browse
-                  </Button>
-                  <Button variant="secondary" onPress={openDiff} isDisabled={!hasRepo}>
-                    <FileDiff size={16} aria-hidden="true" />
-                    diff (HEAD)
-                  </Button>
-                  <Button variant="secondary" onPress={openGraph} isDisabled={!hasRepo}>
-                    <GitGraph size={16} aria-hidden="true" />
-                    graph
-                  </Button>
-                </div>
-              )}
-            </form.Subscribe>
           </form>
         </section>
 
