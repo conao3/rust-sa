@@ -56,7 +56,7 @@ jobs:
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - run: |
           sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" src-tauri/Cargo.toml
-          cargo check --manifest-path src-tauri/Cargo.toml --bin sa
+          cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version=1 > /dev/null
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
