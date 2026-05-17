@@ -30,12 +30,12 @@ surfaces are not stable.
 cargo install conao3-sa
 ```
 
-Two executables land in `~/.cargo/bin`:
+One executable lands in `~/.cargo/bin`:
 
-| Binary  | What it does                                                                  |
-| ------- | ----------------------------------------------------------------------------- |
-| `sa`    | Tauri desktop shell — spawns the axum backend in-process and opens a WebView. |
-| `serve` | Headless axum backend at `127.0.0.1:4000` (GraphQL + REST + SSE).             |
+| Command       | What it does                                                                  |
+| ------------- | ----------------------------------------------------------------------------- |
+| `sa`          | Tauri desktop shell — spawns the axum backend in-process and opens a WebView. |
+| `sa --serve`  | Headless axum backend at `127.0.0.1:4000` (GraphQL + REST + SSE), no UI.      |
 
 The published crate **bundles a pre-built SPA**, so `sa` works out of
 the box without a Node/pnpm toolchain on the host.
@@ -73,7 +73,7 @@ it on first run.
 sa
 
 # Or headless backend + browser (useful for development):
-serve &
+sa --serve &
 # then run the frontend dev server in another shell:
 #   make -C frontend dev   # vite via portless at https://sa.localhost
 ```
@@ -117,7 +117,7 @@ in browser `localStorage`.
 ```
 src-tauri/      Rust backend (axum + GraphQL + git CLI)
   src/main.rs        Tauri shell (executable: sa)
-  src/bin/serve.rs   axum binary for dev (cargo run --bin serve)
+  src/server.rs      axum + GraphQL backend (also reachable via `sa --serve`)
 frontend/       TanStack Start frontend
   src/routes/   __root, /, /browse, /compare/$, /graph, /preference, /design, /health
   src/components, src/lib
