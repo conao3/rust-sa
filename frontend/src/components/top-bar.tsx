@@ -14,6 +14,7 @@ import {
   Popover,
   Header as RACHeader,
 } from 'react-aria-components'
+import { BrandMark } from '#/components/brand-mark'
 import { Button } from '#/components/ui/button'
 import { GitHubLink } from '#/components/github-link'
 
@@ -205,16 +206,6 @@ function ClearPromptsButton({ onPress, label }: { onPress: () => void; label: st
         </Modal>
       </ModalOverlay>
     </>
-  )
-}
-
-function BrandMark() {
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-      <i className="inline-block w-1 h-3.5 bg-rust" />
-      <i className="inline-block w-1 h-3.5 bg-ink mt-1" />
-      <i className="inline-block w-1 h-3.5 bg-rust opacity-50 -mt-1" />
-    </span>
   )
 }
 

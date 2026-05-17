@@ -4,21 +4,14 @@ import { useHotkeys } from '@tanstack/react-hotkeys'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { GitStatusEntry } from '@pierre/trees'
 import {
-  ChevronDown,
-  ChevronRight,
-  CircleDot,
   FileDiff,
-  FilePen,
   GitBranch,
   GitCommitHorizontal,
   RotateCcw,
-  Search,
   Split,
   Tag as TagIcon,
-  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Button as AriaButton, Input as AriaInput, SearchField } from 'react-aria-components'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
@@ -28,7 +21,14 @@ import clsx from 'clsx'
 import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { GraphColumn } from '#/components/graph-column'
-import { fuzzyScore } from '#/lib/fuzzy'
+import { RefSection, type GitRef as RefSectionGitRef } from '#/components/graph-ref-section'
+import {
+  isSpecial,
+  specialLabel,
+  SpecialMeta,
+  SpecialRows,
+  type SpecialId,
+} from '#/components/graph-special'
 import { layoutGraph, type GraphNode } from '#/lib/git-graph'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
@@ -101,11 +101,7 @@ const PREVIEW_FILES_QUERY = gql`
   }
 `
 
-interface GitRef {
-  name: string
-  shortSha: string
-  isCurrent: boolean
-}
+type GitRef = RefSectionGitRef
 
 const REFS_QUERY = gql`
   query Refs($repo: String!) {
@@ -184,7 +180,7 @@ function GraphPage() {
     else setBase(sha)
   }
 
-  const onSpecialClick = (e: MouseEvent, id: 'WORKING' | 'STAGING') => {
+  const onSpecialClick = (e: MouseEvent, id: SpecialId) => {
     if (e.ctrlKey || e.metaKey) setHead(id)
     else setBase(id)
   }
@@ -255,6 +251,7 @@ function GraphPage() {
           <SpecialRows
             base={base}
             head={head}
+            rowHeight={ROW_HEIGHT}
             onSelect={onSpecialClick}
             onDoubleSelect={openSpecDiff}
           />
@@ -264,6 +261,7 @@ function GraphPage() {
             refs={branches}
             base={base}
             head={head}
+            rowHeight={ROW_HEIGHT}
             onClick={onRefClick}
             onDoubleClick={openSpecDiff}
             storageKey="rust-sa:graph-branches-open"
@@ -274,6 +272,7 @@ function GraphPage() {
             refs={tags}
             base={base}
             head={head}
+            rowHeight={ROW_HEIGHT}
             onClick={onRefClick}
             onDoubleClick={openSpecDiff}
             storageKey="rust-sa:graph-tags-open"
@@ -309,9 +308,9 @@ function GraphPage() {
               commit={anySpecial || head ? null : (commits.find((c) => c.sha === base) ?? null)}
               special={
                 baseIsSpecial && !head
-                  ? (base as 'WORKING' | 'STAGING')
+                  ? (base as SpecialId)
                   : headIsSpecial && !baseIsSpecial
-                    ? (head as 'WORKING' | 'STAGING')
+                    ? (head as SpecialId)
                     : null
               }
             />
@@ -365,7 +364,7 @@ function DiffPreview({
   layout: Mode
   theme: Theme
   commit: Commit | null
-  special: 'WORKING' | 'STAGING' | null
+  special: SpecialId | null
 }) {
   const [treeWStr, setTreeWStr] = usePreference<string>('rust-sa:graph-tree-w', '280')
   const treeW = Number(treeWStr) || 280
@@ -426,222 +425,6 @@ function DiffPreview({
         {commit && <CommitMeta commit={commit} />}
         {body}
       </div>
-    </div>
-  )
-}
-
-function isSpecial(v: string | null): boolean {
-  if (!v) return false
-  const u = v.toUpperCase()
-  return u === 'WORKING' || u === 'STAGING'
-}
-
-function specialLabel(id: string): string | null {
-  const u = id.toUpperCase()
-  if (u === 'WORKING') return 'working'
-  if (u === 'STAGING') return 'staging'
-  return null
-}
-
-const SPECIAL_DEFS = [
-  {
-    id: 'WORKING' as const,
-    label: 'working',
-    description: 'uncommitted (staged + unstaged) vs HEAD',
-    icon: FilePen,
-  },
-  {
-    id: 'STAGING' as const,
-    label: 'staging',
-    description: 'staged (index) vs HEAD',
-    icon: CircleDot,
-  },
-]
-
-function SpecialRows({
-  base,
-  head,
-  onSelect,
-  onDoubleSelect,
-}: {
-  base: string | null
-  head: string | null
-  onSelect: (e: MouseEvent, id: 'WORKING' | 'STAGING') => void
-  onDoubleSelect: (id: 'WORKING' | 'STAGING') => void
-}) {
-  return (
-    <div className="border-b border-hairline bg-amber-soft">
-      {SPECIAL_DEFS.map(({ id, label, description, icon: Icon }) => {
-        const isBase = base === id
-        const isHead = head === id
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={(e) => onSelect(e, id)}
-            onDoubleClick={() => onDoubleSelect(id)}
-            style={{ height: ROW_HEIGHT }}
-            className={clsx(
-              'w-full text-left flex items-center gap-2 pr-3 pl-3 font-mono text-xs cursor-pointer border-l-2',
-              isBase
-                ? 'bg-rust-soft border-l-rust'
-                : isHead
-                  ? 'bg-moss-soft border-l-moss'
-                  : 'border-l-transparent hover:bg-amber/10',
-            )}
-          >
-            <Icon size={14} aria-hidden="true" className="text-amber flex-shrink-0" />
-            <span className="text-amber font-medium uppercase tracking-wider">{label}</span>
-            <span className="text-mute flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-              {description}
-            </span>
-            {isBase && <span className="text-rust uppercase tracking-wider">base</span>}
-            {isHead && <span className="text-moss uppercase tracking-wider">head</span>}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function SpecialMeta({ special }: { special: 'WORKING' | 'STAGING' }) {
-  const def = SPECIAL_DEFS.find((d) => d.id === special)!
-  const Icon = def.icon
-  return (
-    <header className="px-5 pt-5 pb-4 border-b border-hairline bg-amber-soft">
-      <div className="flex items-center gap-3 font-mono text-xs">
-        <Icon size={16} aria-hidden="true" className="text-amber" />
-        <span className="text-amber uppercase tracking-widest font-medium">{def.label}</span>
-        <span className="text-mute">·</span>
-        <span className="text-mute">{def.description}</span>
-      </div>
-      <h2 className="mt-2 m-0 font-serif text-xl tracking-tight text-ink">
-        {special === 'WORKING' ? 'Working tree changes' : 'Staged changes'}
-      </h2>
-    </header>
-  )
-}
-
-function RefSection({
-  title,
-  icon: Icon,
-  refs,
-  base,
-  head,
-  onClick,
-  onDoubleClick,
-  storageKey,
-}: {
-  title: string
-  icon: typeof GitBranch
-  refs: GitRef[]
-  base: string | null
-  head: string | null
-  onClick: (e: MouseEvent, name: string) => void
-  onDoubleClick: (name: string) => void
-  storageKey: string
-}) {
-  const [openStr, setOpenStr] = usePreference<string>(storageKey, 'false')
-  const open = openStr === 'true'
-  const [query, setQuery] = useState('')
-  const [pendingFocus, setPendingFocus] = useState(false)
-  const filterInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (open && pendingFocus) {
-      filterInputRef.current?.focus()
-      setPendingFocus(false)
-    }
-  }, [open, pendingFocus])
-
-  if (refs.length === 0) return null
-  const filtered = query
-    ? refs
-        .map((r) => ({ ref: r, score: fuzzyScore(query, r.name) }))
-        .filter((x) => x.score > 0)
-        .toSorted((a, b) => b.score - a.score || a.ref.name.localeCompare(b.ref.name))
-        .map((x) => x.ref)
-    : refs
-  const handleToggle = () => {
-    const next = !open
-    setOpenStr(next ? 'true' : 'false')
-    if (next) setPendingFocus(true)
-  }
-  return (
-    <div className="border-b border-hairline-soft">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-full flex items-center gap-1.5 px-3 py-2 font-mono text-xs uppercase tracking-widest text-mute hover:text-ink hover:bg-bg-card cursor-pointer"
-      >
-        {open ? (
-          <ChevronDown size={14} aria-hidden="true" />
-        ) : (
-          <ChevronRight size={14} aria-hidden="true" />
-        )}
-        <Icon size={14} aria-hidden="true" />
-        {title}
-        <span className="ml-auto normal-case tracking-normal text-faint">{refs.length}</span>
-      </button>
-      {open && (
-        <>
-          {refs.length > 5 && (
-            <SearchField
-              value={query}
-              onChange={setQuery}
-              aria-label={`Filter ${title}`}
-              className="group flex items-center gap-1.5 px-3 py-1.5 border-b border-hairline-soft font-mono text-xs text-mute"
-            >
-              <Search size={14} aria-hidden="true" className="text-faint flex-shrink-0" />
-              <AriaInput
-                ref={filterInputRef}
-                placeholder={`filter ${title}…`}
-                className="flex-1 bg-transparent text-ink outline-none placeholder:text-faint min-w-0"
-              />
-              <AriaButton
-                slot="clear"
-                aria-label="clear filter"
-                className="group-data-[empty]:hidden text-faint hover:text-ink cursor-pointer inline-flex items-center"
-              >
-                <X size={14} aria-hidden="true" />
-              </AriaButton>
-              <span className="text-faint group-data-[empty]:hidden">{filtered.length}</span>
-            </SearchField>
-          )}
-          {filtered.length === 0 && (
-            <div className="px-3 py-2 font-mono text-xs text-mute">no matches</div>
-          )}
-          {filtered.map((r) => {
-            const isBase = base === r.name
-            const isHead = head === r.name
-            return (
-              <button
-                key={r.name}
-                type="button"
-                onClick={(e) => onClick(e, r.name)}
-                onDoubleClick={() => onDoubleClick(r.name)}
-                style={{ height: ROW_HEIGHT }}
-                className={clsx(
-                  'w-full text-left flex items-center gap-2 px-3 font-mono text-xs cursor-pointer border-l-2',
-                  isBase
-                    ? 'bg-rust-soft border-l-rust'
-                    : isHead
-                      ? 'bg-moss-soft border-l-moss'
-                      : 'border-l-transparent hover:bg-bg-card',
-                )}
-              >
-                <span className="text-ink truncate flex-1">{r.name}</span>
-                {r.isCurrent && (
-                  <span className="text-amber uppercase tracking-wider text-[10px]">HEAD</span>
-                )}
-                <span className="text-rust">{r.shortSha}</span>
-                {isBase && <span className="text-rust uppercase tracking-wider">base</span>}
-                {isHead && <span className="text-moss uppercase tracking-wider">head</span>}
-              </button>
-            )
-          })}
-        </>
-      )}
     </div>
   )
 }

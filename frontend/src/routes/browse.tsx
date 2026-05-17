@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client/react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { File, FileDiff, GitGraph } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { BrandMark } from '#/components/brand-mark'
 import { FileTreeView } from '#/components/file-tree-view'
 import { GitHubLink } from '#/components/github-link'
 import { ResizeHandle } from '#/components/ui/resize-handle'
@@ -218,15 +219,5 @@ function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string
         )}
       </div>
     </div>
-  )
-}
-
-function BrandMark() {
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-      <i className="inline-block w-1 h-3.5 bg-rust" />
-      <i className="inline-block w-1 h-3.5 bg-ink mt-1" />
-      <i className="inline-block w-1 h-3.5 bg-rust opacity-50 -mt-1" />
-    </span>
   )
 }
