@@ -84,33 +84,41 @@ function CopyPromptsButton({ onPress, label }: { onPress: () => void; label: str
         window.setTimeout(() => setCopied(false), 1500)
       }}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        {copied ? (
-          <motion.span
-            key="copied"
-            className="inline-flex items-center gap-1.5 text-moss"
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          >
-            <Check size={16} aria-hidden="true" />
-            copied!
-          </motion.span>
-        ) : (
-          <motion.span
-            key="copy"
-            className="inline-flex items-center gap-1.5"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-          >
-            <ClipboardCopy size={16} aria-hidden="true" />
-            {label}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <span className="relative inline-flex items-center justify-center">
+        <span aria-hidden="true" className="invisible inline-flex items-center gap-1.5">
+          <ClipboardCopy size={16} />
+          {label}
+        </span>
+        <span className="absolute inset-0 inline-flex items-center justify-center">
+          <AnimatePresence mode="wait" initial={false}>
+            {copied ? (
+              <motion.span
+                key="copied"
+                className="inline-flex items-center gap-1.5 text-moss"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              >
+                <Check size={16} aria-hidden="true" />
+                copied!
+              </motion.span>
+            ) : (
+              <motion.span
+                key="copy"
+                className="inline-flex items-center gap-1.5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+              >
+                <ClipboardCopy size={16} aria-hidden="true" />
+                {label}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </span>
+      </span>
     </Button>
   )
 }
