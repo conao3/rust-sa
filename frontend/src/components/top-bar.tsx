@@ -15,6 +15,7 @@ import {
   Header as RACHeader,
 } from 'react-aria-components'
 import { Button } from '#/components/ui/button'
+import { GitHubLink } from '#/components/github-link'
 
 export type Mode = 'unified' | 'split'
 export type Theme = 'light' | 'dark'
@@ -246,6 +247,7 @@ export function TopBar({
         <BrandMark />
         <span className="font-medium">rust-sa</span>
       </Link>
+      <GitHubLink />
 
       <div className="flex items-center gap-2 pl-4 border-l border-hairline flex-shrink-0">
         <span className="text-ink">{base}</span>

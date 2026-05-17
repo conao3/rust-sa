@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { GitHubLink } from '#/components/github-link'
 import { Segmented, SegmentedItem } from '#/components/ui/segmented'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
@@ -28,6 +29,7 @@ function PreferencePage() {
           </Link>
           <span className="font-mono text-xs text-faint">·</span>
           <span className="font-mono text-sm font-medium text-ink">preferences</span>
+          <GitHubLink />
         </div>
       </header>
 

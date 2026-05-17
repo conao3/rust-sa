@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FolderPicker } from '#/components/folder-picker'
+import { GitHubLink } from '#/components/github-link'
 import { Button } from '#/components/ui/button'
 import { Kbd } from '#/components/ui/kbd'
 import { usePreference, useRootAttribute } from '#/lib/preference'
@@ -80,6 +81,7 @@ function HomePage() {
         <div className="max-w-4xl mx-auto px-8 h-[var(--topbar-h)] flex items-center gap-3">
           <BrandMark />
           <span className="font-mono text-sm font-medium text-ink">rust-sa</span>
+          <GitHubLink />
           <span className="ml-2 font-mono text-xs text-mute">local git diff reviewer</span>
           <Link
             to="/preference"

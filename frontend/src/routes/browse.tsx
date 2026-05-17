@@ -4,6 +4,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { File, FileDiff, GitGraph } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FileTreeView } from '#/components/file-tree-view'
+import { GitHubLink } from '#/components/github-link'
 import { ResizeHandle } from '#/components/ui/resize-handle'
 import { API_ORIGIN } from '#/lib/apollo'
 import { highlightCode } from '#/lib/highlight'
@@ -75,6 +76,7 @@ function BrowsePage() {
           <BrandMark />
           <span className="font-medium">rust-sa</span>
         </Link>
+        <GitHubLink />
         <span className="text-mute pl-4 border-l border-hairline truncate">{repo}</span>
         <span className="text-faint">@</span>
         <span className="text-ink">{rev}</span>
