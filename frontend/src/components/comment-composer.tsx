@@ -50,13 +50,26 @@ export function CommentComposer({
             }
           }}
         />
-        <div className="flex items-center gap-2">
-          <span className="flex-1 font-mono text-xs text-faint">⌘↵ submit · esc cancel</span>
-          <Button variant="ghost" size="sm" onPress={onCancel}>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex-1 min-w-0 truncate font-mono text-xs text-faint">
+            ⌘↵ submit · esc cancel
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={onCancel}
+            className="flex-shrink-0 whitespace-nowrap"
+          >
             <X size={16} aria-hidden="true" />
             cancel
           </Button>
-          <Button variant="primary" size="sm" onPress={submit} isDisabled={!value.trim()}>
+          <Button
+            variant="primary"
+            size="sm"
+            onPress={submit}
+            isDisabled={!value.trim()}
+            className="flex-shrink-0 whitespace-nowrap"
+          >
             <Send size={16} aria-hidden="true" />
             submit
           </Button>
