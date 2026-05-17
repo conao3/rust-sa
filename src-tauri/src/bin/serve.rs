@@ -40,12 +40,65 @@ struct FileEntry {
     deletions: i32,
 }
 
+#[derive(SimpleObject)]
+struct DirEntry {
+    name: String,
+    is_dir: bool,
+    is_git_repo: bool,
+    is_hidden: bool,
+}
+
+#[derive(SimpleObject)]
+struct DirListing {
+    path: String,
+    parent: Option<String>,
+    entries: Vec<DirEntry>,
+}
+
 struct Query;
 
 #[Object]
 impl Query {
     async fn health(&self) -> String {
         "ok".to_string()
+    }
+
+    async fn list_dir(&self, path: Option<String>) -> async_graphql::Result<DirListing> {
+        let start = path
+            .filter(|p| !p.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("/"));
+        let start = start
+            .canonicalize()
+            .map_err(|e| async_graphql::Error::new(format!("canonicalize {}: {e}", start.display())))?;
+        if !start.is_dir() {
+            return Err(async_graphql::Error::new(format!("not a directory: {}", start.display())));
+        }
+        let mut entries: Vec<DirEntry> = std::fs::read_dir(&start)
+            .map_err(|e| async_graphql::Error::new(format!("read_dir {}: {e}", start.display())))?
+            .filter_map(|res| res.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let ft = e.file_type().ok()?;
+                let is_dir = ft.is_dir()
+                    || (ft.is_symlink() && std::fs::metadata(e.path()).map(|m| m.is_dir()).unwrap_or(false));
+                let is_git_repo = is_dir && e.path().join(".git").exists();
+                let is_hidden = name.starts_with('.');
+                Some(DirEntry { name, is_dir, is_git_repo, is_hidden })
+            })
+            .collect();
+        entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        });
+        let parent = start.parent().map(|p| p.to_string_lossy().into_owned());
+        Ok(DirListing {
+            path: start.to_string_lossy().into_owned(),
+            parent,
+            entries,
+        })
     }
 
     async fn files(
@@ -58,7 +111,15 @@ impl Query {
         let (subcmd, extra): (&str, Vec<String>) = if is_range {
             ("diff", vec![rev.clone()])
         } else {
-            ("show", vec!["--format=".into(), rev.clone()])
+            (
+                "show",
+                vec![
+                    "--format=".into(),
+                    "-m".into(),
+                    "--first-parent".into(),
+                    rev.clone(),
+                ],
+            )
         };
 
         let mut numstat_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--numstat".into()];
@@ -220,6 +281,8 @@ async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
             "show".into(),
             "--no-color".into(),
             "--format=".into(),
+            "-m".into(),
+            "--first-parent".into(),
             rev.clone(),
         ]
     };
