@@ -73,9 +73,6 @@ jobs:
     needs: [version-bump]
     permissions:
       id-token: write
-    environment:
-      name: crates.io
-      url: https://crates.io/crates/conao3-sa
     steps:
       - uses: actions/checkout@v4
         with:
