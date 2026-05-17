@@ -130,12 +130,20 @@ function ComparePage() {
   })
   const liveFiles = refreshKey === 0 ? files : (data?.files ?? files)
   const [livePulse, setLivePulse] = useState(false)
-  useSSE(`${API_ORIGIN}/api/events?repo=${encodeURIComponent(repo)}`, () => {
-    setRefreshKey((k) => k + 1)
-    refetch()
-    setLivePulse(true)
-    window.setTimeout(() => setLivePulse(false), 2500)
-  })
+  useSSE(
+    `${API_ORIGIN}/api/events?repo=${encodeURIComponent(repo)}`,
+    async () => {
+      const result = await refetch()
+      const next = result.data?.files ?? []
+      const sig = (f: { path: string; additions: number; deletions: number }[]) =>
+        f.map((x) => `${x.path}:${x.additions}:${x.deletions}`).join('|')
+      if (sig(next) === sig(liveFiles)) return
+      setRefreshKey((k) => k + 1)
+      setLivePulse(true)
+      window.setTimeout(() => setLivePulse(false), 1200)
+    },
+    1500,
+  )
   const fileEntries = liveFiles.map((f) => ({ path: f.path, status: gitStatusKey(f.status) }))
   const paths = fileEntries.map((f) => f.path)
   const { isViewed, toggle } = useViewed(rev)

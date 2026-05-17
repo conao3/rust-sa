@@ -489,16 +489,19 @@ fn build_router(schema: AppSchema) -> Router {
         )
 }
 
-fn any_unignored(repo_root: &Path, paths: &[PathBuf]) -> bool {
+fn unignored_paths(repo_root: &Path, paths: &[PathBuf]) -> Vec<PathBuf> {
     let candidates: Vec<&PathBuf> = paths
         .iter()
         .filter(|p| {
             let s = p.to_string_lossy();
-            !s.contains("/.git/") && !s.ends_with("/.git")
+            if s.contains("/.git/") || s.ends_with("/.git") {
+                return false;
+            }
+            !p.is_dir()
         })
         .collect();
     if candidates.is_empty() {
-        return false;
+        return vec![];
     }
 
     let mut child = match std::process::Command::new("git")
@@ -510,12 +513,12 @@ fn any_unignored(repo_root: &Path, paths: &[PathBuf]) -> bool {
         .spawn()
     {
         Ok(c) => c,
-        Err(_) => return true,
+        Err(_) => return candidates.iter().map(|p| (*p).clone()).collect(),
     };
     {
         let stdin = match child.stdin.as_mut() {
             Some(s) => s,
-            None => return true,
+            None => return candidates.iter().map(|p| (*p).clone()).collect(),
         };
         let mut buf = Vec::new();
         for p in &candidates {
@@ -523,15 +526,24 @@ fn any_unignored(repo_root: &Path, paths: &[PathBuf]) -> bool {
             buf.push(0);
         }
         if stdin.write_all(&buf).is_err() {
-            return true;
+            return candidates.iter().map(|p| (*p).clone()).collect();
         }
     }
     let output = match child.wait_with_output() {
         Ok(o) => o,
-        Err(_) => return true,
+        Err(_) => return candidates.iter().map(|p| (*p).clone()).collect(),
     };
-    let ignored_count = output.stdout.iter().filter(|&&b| b == 0).count();
-    ignored_count < candidates.len()
+    let ignored: std::collections::HashSet<String> = output
+        .stdout
+        .split(|&b| b == 0)
+        .filter(|s| !s.is_empty())
+        .map(|s| String::from_utf8_lossy(s).into_owned())
+        .collect();
+    candidates
+        .into_iter()
+        .filter(|p| !ignored.contains(&p.to_string_lossy().into_owned()))
+        .cloned()
+        .collect()
 }
 
 fn spawn_watcher(
@@ -540,10 +552,10 @@ fn spawn_watcher(
 ) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     let watcher_tx = tx.clone();
     let watch_root = root.clone();
-    let mut debouncer = new_debouncer(Duration::from_secs(2), move |res: DebounceEventResult| {
+    let mut debouncer = new_debouncer(Duration::from_secs(3), move |res: DebounceEventResult| {
         if let Ok(events) = res {
             let paths: Vec<PathBuf> = events.iter().map(|e| e.path.clone()).collect();
-            if any_unignored(&watch_root, &paths) {
+            if !unignored_paths(&watch_root, &paths).is_empty() {
                 let _ = watcher_tx.send("changed".to_string());
             }
         }
