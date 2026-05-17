@@ -2,9 +2,9 @@ import type { HTMLAttributes } from 'react'
 import { cn } from '#/lib/cn'
 
 const tones = {
-  rust: 'bg-rust text-[#fff8ee]',
+  rust: 'bg-rust text-cream',
   amber: 'bg-amber text-ink',
-  moss: 'bg-[var(--moss-strong)] text-moss',
+  moss: 'bg-moss-strong text-moss',
   neutral: 'bg-bg-card text-ink border border-hairline',
 } as const
 
@@ -16,9 +16,9 @@ export function Tag({ tone = 'neutral', className, ...rest }: TagProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-[3px] font-mono text-[10.5px] leading-none',
+        'inline-flex items-center rounded-full px-2 py-1 font-mono text-xs leading-none',
         tones[tone],
-        className
+        className,
       )}
       {...rest}
     />

@@ -21,21 +21,13 @@ function HealthPage() {
 
       {loading && <div className="text-muted">Loading...</div>}
 
-      {error && (
-        <div className="text-red-500">
-          Error: {error.message}
-        </div>
-      )}
+      {error && <div className="text-red-500">Error: {error.message}</div>}
 
       {data && (
         <div className="rounded-lg border p-6">
           <div className="text-sm text-muted">GraphQL Response</div>
-          <div className="mt-2 text-3xl font-mono">
-            {data.health}
-          </div>
-          <div className="mt-1 text-xs text-muted">
-            from http://localhost:4000/graphql
-          </div>
+          <div className="mt-2 text-3xl font-mono">{data.health}</div>
+          <div className="mt-1 text-xs text-muted">from http://localhost:4000/graphql</div>
         </div>
       )}
     </div>

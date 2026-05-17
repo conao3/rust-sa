@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/router.tsx", "src/routes/**/*.tsx"],
+  "project": ["src/**/*.{ts,tsx}", "!src/routeTree.gen.ts"],
+  "ignoreDependencies": [
+    "@tanstack/react-devtools",
+    "@tanstack/react-router-devtools",
+    "@tanstack/react-router-ssr-query",
+    "@tanstack/router-plugin",
+    "@tailwindcss/typography",
+    "tailwindcss",
+    "@testing-library/dom",
+    "@testing-library/react",
+    "oxlint",
+    "oxfmt"
+  ]
+}

@@ -13,7 +13,11 @@ build:
 .PHONY: check
 check:
 	$(MAKE) -C src-tauri check
-	$(MAKE) -C frontend check
+
+.PHONY: lint
+lint:
+	$(MAKE) -C src-tauri check
+	$(MAKE) -C frontend lint
 
 .PHONY: fmt
 fmt:

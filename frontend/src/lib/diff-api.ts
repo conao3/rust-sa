@@ -7,7 +7,7 @@ export interface DiffState {
   error: Error | null
 }
 
-export function diffUrl(rev: string, repo: string, path?: string): string {
+function diffUrl(rev: string, repo: string, path?: string): string {
   const params = new URLSearchParams({ rev, repo })
   if (path) params.set('path', path)
   return `${API_ORIGIN}/api/diff?${params.toString()}`
@@ -45,7 +45,11 @@ export function useDiff(
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setState({ patch: '', loading: false, error: err instanceof Error ? err : new Error(String(err)) })
+        setState({
+          patch: '',
+          loading: false,
+          error: err instanceof Error ? err : new Error(String(err)),
+        })
       })
     return () => {
       cancelled = true

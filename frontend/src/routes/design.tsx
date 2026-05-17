@@ -17,10 +17,8 @@ function DesignPage() {
   return (
     <div className="min-h-screen bg-bg text-ink font-sans">
       <header className="border-b border-hairline px-16 pt-14 pb-6">
-        <h1 className="m-0 font-serif text-[56px] leading-none tracking-[-0.02em] font-normal">
-          rust-sa
-        </h1>
-        <p className="mt-2 max-w-[460px] text-mute text-sm leading-relaxed">
+        <h1 className="m-0 font-serif text-6xl leading-none tracking-tight font-normal">rust-sa</h1>
+        <p className="mt-2 max-w-md text-mute text-sm leading-relaxed">
           Design system — warm paper canvas, mono-forward chrome, oxide-rust accent.
         </p>
       </header>
@@ -86,16 +84,37 @@ function DesignPage() {
 
       <Section tag="04" title="Palette">
         <Group label="surfaces">
-          <Swatch name="bg" value="#f4efe6" style={{ background: '#f4efe6', color: '#1a1815' }} bordered />
-          <Swatch name="bg-soft" value="#ede6d6" style={{ background: '#ede6d6', color: '#1a1815' }} />
-          <Swatch name="bg-card" value="#e6dec9" style={{ background: '#e6dec9', color: '#1a1815' }} />
+          <Swatch
+            name="bg"
+            value="#f4efe6"
+            style={{ background: '#f4efe6', color: '#1a1815' }}
+            bordered
+          />
+          <Swatch
+            name="bg-soft"
+            value="#ede6d6"
+            style={{ background: '#ede6d6', color: '#1a1815' }}
+          />
+          <Swatch
+            name="bg-card"
+            value="#e6dec9"
+            style={{ background: '#e6dec9', color: '#1a1815' }}
+          />
           <Swatch name="dark" value="#1c1a17" style={{ background: '#1c1a17', color: '#ece4d2' }} />
         </Group>
         <Group label="accent">
           <Swatch name="rust" value="#a04a2a" style={{ background: '#a04a2a', color: '#fff8ee' }} />
-          <Swatch name="rust-deep" value="#7a3520" style={{ background: '#7a3520', color: '#fff8ee' }} />
+          <Swatch
+            name="rust-deep"
+            value="#7a3520"
+            style={{ background: '#7a3520', color: '#fff8ee' }}
+          />
           <Swatch name="moss" value="#4f7a6a" style={{ background: '#4f7a6a', color: '#fff8ee' }} />
-          <Swatch name="crimson" value="#a83a3a" style={{ background: '#a83a3a', color: '#fff8ee' }} />
+          <Swatch
+            name="crimson"
+            value="#a83a3a"
+            style={{ background: '#a83a3a', color: '#fff8ee' }}
+          />
         </Group>
       </Section>
     </div>
@@ -114,12 +133,10 @@ function Section({
   return (
     <section className="border-t border-dashed border-hairline px-16 py-12">
       <div className="mb-7 flex items-baseline gap-4">
-        <span className="border-r border-hairline pr-3 mr-1 font-mono text-[11px] uppercase tracking-[0.08em] text-faint">
+        <span className="border-r border-hairline pr-3 mr-1 font-mono text-xs uppercase tracking-widest text-faint">
           {tag}
         </span>
-        <h2 className="m-0 font-serif text-[32px] font-normal tracking-[-0.01em]">
-          {title}
-        </h2>
+        <h2 className="m-0 font-serif text-3xl font-normal tracking-tight">{title}</h2>
       </div>
       <div className="flex flex-col gap-6">{children}</div>
     </section>
@@ -129,9 +146,7 @@ function Section({
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">
-        {label}
-      </div>
+      <div className="font-mono text-xs uppercase tracking-widest text-faint">{label}</div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   )
@@ -139,7 +154,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 function KeyRow({ label, keys }: { label: string; keys: string[] }) {
   return (
-    <div className="flex items-center justify-between text-ink-2 text-[13px]">
+    <div className="flex items-center justify-between text-ink-2 text-sm">
       <span>{label}</span>
       <span className="inline-flex gap-1">
         {keys.map((k, i) => (
@@ -164,13 +179,13 @@ function Swatch({
   return (
     <div
       className={
-        'flex min-h-[64px] w-[160px] flex-col justify-end gap-1 rounded-[3px] px-3 pt-3 pb-2.5 font-mono' +
+        'flex min-h-16 w-40 flex-col justify-end gap-1 rounded-sm px-3 pt-3 pb-2.5 font-mono' +
         (bordered ? ' border border-hairline' : '')
       }
       style={style}
     >
-      <span className="text-[11px] font-medium">{name}</span>
-      <span className="text-[10.5px] opacity-70 tracking-[0.02em]">{value}</span>
+      <span className="text-xs font-medium">{name}</span>
+      <span className="text-xs opacity-70 tracking-wide">{value}</span>
     </div>
   )
 }

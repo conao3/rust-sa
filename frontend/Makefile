@@ -6,13 +6,16 @@ dev:
 build:
 	pnpm build
 
-.PHONY: check
-check:
-	pnpm check
+.PHONY: lint
+lint:
+	pnpm exec tsc --noEmit
+	pnpm exec oxlint
+	pnpm exec oxfmt --check
+	pnpm exec knip
 
 .PHONY: fmt
 fmt:
-	pnpm format
+	pnpm exec oxfmt --write
 
 .PHONY: clean
 clean:
