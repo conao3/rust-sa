@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.conao3.rust-sa",
   "build": {
-    "frontendDist": "../frontend/dist",
-    "devUrl": "https://sa.localhost"
+    "frontendDist": "../frontend/.output/public",
+    "devUrl": "https://sa.localhost",
+    "beforeBuildCommand": "make -C ../frontend build"
   },
   "app": {
     "windows": [

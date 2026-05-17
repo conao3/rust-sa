@@ -5,6 +5,7 @@ dev:
 .PHONY: build
 build:
 	pnpm build
+	cp .output/public/_shell.html .output/public/index.html
 
 .PHONY: lint
 lint:

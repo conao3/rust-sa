@@ -11,6 +11,10 @@ readme = "../README.md"
 keywords = ["git", "diff", "review", "tauri"]
 categories = ["development-tools", "command-line-utilities"]
 
+[lib]
+name = "conao3_sa"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sa"
 path = "src/main.rs"
