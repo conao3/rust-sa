@@ -147,6 +147,17 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
                 isGitRepo={e.isGitRepo}
                 isHidden={e.isHidden}
                 onActivate={() => e.isDir && enter(e.name)}
+                onPickRepo={
+                  e.isGitRepo
+                    ? () => {
+                        if (!listing) return
+                        const next =
+                          listing.path === '/' ? `/${e.name}` : `${listing.path}/${e.name}`
+                        onPick(next)
+                        close()
+                      }
+                    : undefined
+                }
               />
             ))}
             {!loading && !error && entries.length === 0 && (
@@ -220,6 +231,7 @@ function EntryRow({
   isHidden,
   icon,
   onActivate,
+  onPickRepo,
 }: {
   name: string
   isDir: boolean
@@ -227,6 +239,7 @@ function EntryRow({
   isHidden?: boolean
   icon?: React.ReactNode
   onActivate: () => void
+  onPickRepo?: () => void
 }) {
   const fallbackIcon = isDir ? (
     <Folder size={16} aria-hidden="true" className={isGitRepo ? 'text-rust' : ''} />
@@ -234,25 +247,36 @@ function EntryRow({
     <File size={16} aria-hidden="true" />
   )
   return (
-    <button
-      type="button"
-      onClick={onActivate}
-      onDoubleClick={onActivate}
-      disabled={!isDir}
+    <div
       className={clsx(
-        'w-full text-left px-5 py-1.5 font-mono text-xs flex items-center gap-2 border-b border-hairline-soft',
-        isDir ? 'cursor-pointer hover:bg-bg-card' : 'cursor-default text-mute',
+        'group flex items-center border-b border-hairline-soft font-mono text-xs',
         isHidden && 'opacity-60',
       )}
     >
-      <span className="text-faint w-3 inline-flex justify-center">{icon ?? fallbackIcon}</span>
-      <span className={clsx(isGitRepo && 'text-rust')}>{name}</span>
-      {isGitRepo && (
-        <span className="ml-auto inline-flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-rust">
+      <button
+        type="button"
+        onClick={onActivate}
+        onDoubleClick={onActivate}
+        disabled={!isDir}
+        className={clsx(
+          'flex-1 text-left px-5 py-1.5 flex items-center gap-2',
+          isDir ? 'cursor-pointer hover:bg-bg-card' : 'cursor-default text-mute',
+        )}
+      >
+        <span className="text-faint w-3 inline-flex justify-center">{icon ?? fallbackIcon}</span>
+        <span className={clsx(isGitRepo && 'text-rust')}>{name}</span>
+      </button>
+      {isGitRepo && onPickRepo && (
+        <button
+          type="button"
+          onClick={onPickRepo}
+          aria-label={`Browse ${name} as a repository`}
+          className="mr-3 inline-flex items-center gap-1 px-2 py-1 font-mono text-xs uppercase tracking-widest text-rust hover:bg-rust-soft rounded-sm cursor-pointer"
+        >
           <GitBranch size={16} aria-hidden="true" />
           git
-        </span>
+        </button>
       )}
-    </button>
+    </div>
   )
 }
