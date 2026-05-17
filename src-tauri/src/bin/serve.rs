@@ -148,8 +148,11 @@ impl Query {
         repo: String,
     ) -> async_graphql::Result<Vec<FileEntry>> {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
-        let is_range = rev.contains("..");
-        let (subcmd, extra): (&str, Vec<String>) = if is_range {
+        let (subcmd, extra): (&str, Vec<String>) = if rev == "WORKING" {
+            ("diff", vec!["HEAD".into()])
+        } else if rev == "STAGING" {
+            ("diff", vec!["--cached".into(), "HEAD".into()])
+        } else if rev.contains("..") {
             ("diff", vec![rev.clone()])
         } else {
             (
@@ -341,7 +344,16 @@ fn normalize_renamed_path(raw: &str) -> String {
 
 async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
     let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
-    let mut args: Vec<String> = if rev.contains("..") {
+    let mut args: Vec<String> = if rev == "WORKING" {
+        vec!["diff".into(), "--no-color".into(), "HEAD".into()]
+    } else if rev == "STAGING" {
+        vec![
+            "diff".into(),
+            "--no-color".into(),
+            "--cached".into(),
+            "HEAD".into(),
+        ]
+    } else if rev.contains("..") {
         vec!["diff".into(), "--no-color".into(), rev.clone()]
     } else {
         vec![

@@ -69,6 +69,12 @@ function parseSpec(spec: string): { base: string; head: string; separator: '··
   return { base: spec, head: spec, separator: null }
 }
 
+function specShortLabel(spec: string): string {
+  if (spec === 'WORKING') return 'working'
+  if (spec === 'STAGING') return 'staging'
+  return shortSha(spec)
+}
+
 export const Route = createFileRoute('/compare/$')({
   validateSearch: (search: Record<string, unknown>): CompareSearch => ({
     repo: typeof search.repo === 'string' ? search.repo : undefined,
@@ -179,8 +185,8 @@ function ComparePage() {
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
-        base={shortSha(base)}
-        head={separator ? shortSha(head) : undefined}
+        base={specShortLabel(base)}
+        head={separator ? specShortLabel(head) : undefined}
         separator={separator ?? undefined}
         mode={mode}
         onModeChange={setMode}

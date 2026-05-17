@@ -3,7 +3,7 @@ import { useQuery } from '@apollo/client/react'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { GitStatusEntry } from '@pierre/trees'
-import { FileDiff, GitCommitHorizontal, RotateCcw, Split } from 'lucide-react'
+import { CircleDot, FileDiff, FilePen, GitCommitHorizontal, RotateCcw, Split } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
@@ -143,12 +143,25 @@ function GraphPage() {
     else setBase(sha)
   }
 
+  const onSpecialClick = (id: 'WORKING' | 'STAGING') => {
+    setBase(id)
+    setHead(null)
+  }
+
+  const baseIsSpecial = base === 'WORKING' || base === 'STAGING'
+
   const onViewChange = (next: View) => {
     if (next === 'diff')
       navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
   }
 
-  const previewSpec = base ? (head ? `${base}${threeDot ? '...' : '..'}${head}` : base) : null
+  const previewSpec = base
+    ? baseIsSpecial
+      ? base
+      : head
+        ? `${base}${threeDot ? '...' : '..'}${head}`
+        : base
+    : null
 
   const openDiff = () => {
     if (!previewSpec) return
@@ -158,9 +171,9 @@ function GraphPage() {
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
-        base={base ? shortSha(base) : '—'}
-        head={head ? shortSha(head) : '—'}
-        separator={threeDot ? '···' : '··'}
+        base={base ? (specialLabel(base) ?? shortSha(base)) : '—'}
+        head={baseIsSpecial ? undefined : head ? shortSha(head) : '—'}
+        separator={baseIsSpecial ? undefined : threeDot ? '···' : '··'}
         mode={mode}
         onModeChange={setMode}
         view="graph"
@@ -185,6 +198,7 @@ function GraphPage() {
             <div className="px-4 py-2 font-mono text-xs text-mute">loading…</div>
           )}
           {error && <div className="px-4 py-2 font-mono text-xs text-crimson">{error.message}</div>}
+          <SpecialRows base={base} onSelect={onSpecialClick} />
           <CommitList commits={commits} base={base} head={head} onRowClick={onRowClick} />
           <LoadMoreSentinel
             onVisible={loadMore}
@@ -207,7 +221,8 @@ function GraphPage() {
               repo={repo}
               layout={mode}
               theme={theme}
-              commit={head ? null : (commits.find((c) => c.sha === base) ?? null)}
+              commit={baseIsSpecial || head ? null : (commits.find((c) => c.sha === base) ?? null)}
+              special={baseIsSpecial ? (base as 'WORKING' | 'STAGING') : null}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -252,12 +267,14 @@ function DiffPreview({
   layout,
   theme,
   commit,
+  special,
 }: {
   rev: string
   repo: string
   layout: Mode
   theme: Theme
   commit: Commit | null
+  special: 'WORKING' | 'STAGING' | null
 }) {
   const [treeWStr, setTreeWStr] = usePreference<string>('rust-sa:graph-tree-w', '280')
   const treeW = Number(treeWStr) || 280
@@ -314,10 +331,84 @@ function DiffPreview({
         ariaLabel="resize file tree"
       />
       <div className="overflow-y-auto min-w-0">
+        {special && <SpecialMeta special={special} />}
         {commit && <CommitMeta commit={commit} />}
         {body}
       </div>
     </div>
+  )
+}
+
+function specialLabel(id: string): string | null {
+  if (id === 'WORKING') return 'working'
+  if (id === 'STAGING') return 'staging'
+  return null
+}
+
+const SPECIAL_DEFS = [
+  {
+    id: 'WORKING' as const,
+    label: 'working',
+    description: 'uncommitted (staged + unstaged) vs HEAD',
+    icon: FilePen,
+  },
+  {
+    id: 'STAGING' as const,
+    label: 'staging',
+    description: 'staged (index) vs HEAD',
+    icon: CircleDot,
+  },
+]
+
+function SpecialRows({
+  base,
+  onSelect,
+}: {
+  base: string | null
+  onSelect: (id: 'WORKING' | 'STAGING') => void
+}) {
+  return (
+    <div className="border-b border-hairline bg-amber-soft">
+      {SPECIAL_DEFS.map(({ id, label, description, icon: Icon }) => {
+        const active = base === id
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onSelect(id)}
+            style={{ height: ROW_HEIGHT }}
+            className={clsx(
+              'w-full text-left flex items-center gap-2 pr-3 pl-3 font-mono text-xs cursor-pointer border-l-2',
+              active ? 'bg-amber/20 border-l-amber' : 'border-l-transparent hover:bg-amber/10',
+            )}
+          >
+            <Icon size={14} aria-hidden="true" className="text-amber flex-shrink-0" />
+            <span className="text-amber font-medium uppercase tracking-wider">{label}</span>
+            <span className="text-mute flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+              {description}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SpecialMeta({ special }: { special: 'WORKING' | 'STAGING' }) {
+  const def = SPECIAL_DEFS.find((d) => d.id === special)!
+  const Icon = def.icon
+  return (
+    <header className="px-5 pt-5 pb-4 border-b border-hairline bg-amber-soft">
+      <div className="flex items-center gap-3 font-mono text-xs">
+        <Icon size={16} aria-hidden="true" className="text-amber" />
+        <span className="text-amber uppercase tracking-widest font-medium">{def.label}</span>
+        <span className="text-mute">·</span>
+        <span className="text-mute">{def.description}</span>
+      </div>
+      <h2 className="mt-2 m-0 font-serif text-xl tracking-tight text-ink">
+        {special === 'WORKING' ? 'Working tree changes' : 'Staged changes'}
+      </h2>
+    </header>
   )
 }
 
