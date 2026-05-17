@@ -140,20 +140,19 @@ function FileBlock({
 
   useEffect(() => {
     if (loading || error || collapsed) return
-    const container = containerRef.current?.querySelector('diffs-container')
-    const root = container?.shadowRoot
-    if (!root) return
-    if (root.getElementById('rust-sa-scrollbar-style')) return
-    const style = document.createElement('style')
-    style.id = 'rust-sa-scrollbar-style'
-    style.textContent = `
-      *{scrollbar-width:thin;scrollbar-color:var(--hairline) transparent;}
-      *::-webkit-scrollbar{width:8px;height:8px;}
-      *::-webkit-scrollbar-track{background:transparent;}
-      *::-webkit-scrollbar-thumb{background-color:var(--hairline);border-radius:9999px;}
-      *::-webkit-scrollbar-thumb:hover{background-color:var(--faint);}
-    `
-    root.appendChild(style)
+    const adopt = () => {
+      const container = containerRef.current?.querySelector('diffs-container')
+      const root = container?.shadowRoot
+      if (!root) return false
+      if (root.adoptedStyleSheets.includes(diffsScrollbarSheet)) return true
+      root.adoptedStyleSheets = [...root.adoptedStyleSheets, diffsScrollbarSheet]
+      return true
+    }
+    if (adopt()) return
+    const id = window.setInterval(() => {
+      if (adopt()) window.clearInterval(id)
+    }, 100)
+    return () => window.clearInterval(id)
   }, [loading, error, collapsed, patch])
 
   useEffect(() => {
@@ -330,3 +329,17 @@ function FileBlock({
 }
 
 const hideDefaultHeader: NonNullable<RenderCustomHeader> = () => null
+
+const diffsScrollbarSheet = (() => {
+  const sheet = new CSSStyleSheet()
+  sheet.replaceSync(`
+    [data-code]{scrollbar-width:thin;scrollbar-color:var(--hairline) transparent;}
+    [data-code]::-webkit-scrollbar{width:8px;height:8px;}
+    [data-code]::-webkit-scrollbar-track{background:transparent;}
+    [data-code]::-webkit-scrollbar-thumb{background-color:var(--hairline);border:none;border-radius:9999px;}
+    [data-code]:hover::-webkit-scrollbar-thumb,
+    :is([data-diff],[data-file]):hover [data-code]::-webkit-scrollbar-thumb{background-color:var(--faint);}
+    [data-code]::-webkit-scrollbar-corner{background:transparent;}
+  `)
+  return sheet
+})()
