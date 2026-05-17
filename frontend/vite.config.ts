@@ -3,8 +3,9 @@ import { devtools } from '@tanstack/devtools-vite'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 
-import viteReact from '@vitejs/plugin-react'
+import viteReact, { reactCompilerPreset } from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import babel from '@rolldown/plugin-babel'
 import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
@@ -19,6 +20,7 @@ const config = defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
+    babel({ presets: [reactCompilerPreset({ target: '19' })] }),
   ],
 })
 
