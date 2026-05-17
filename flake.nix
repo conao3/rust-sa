@@ -102,6 +102,7 @@
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
               rustToolchain
+              cargo-watch
               nodejs
               pnpm
               cargo-tauri
