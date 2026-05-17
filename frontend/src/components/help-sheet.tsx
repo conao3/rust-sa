@@ -50,14 +50,11 @@ export function HelpSheet({ isOpen, onOpenChange }: HelpSheetProps) {
       <div className="grid grid-cols-2 gap-y-3 gap-x-8">
         {GROUPS.map((group) => (
           <div key={group.label} className="col-span-2 contents">
-            <div className="col-span-2 pt-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-mute">
+            <div className="col-span-2 pt-1 font-mono text-xs uppercase tracking-wider text-mute">
               {group.label}
             </div>
             {group.items.map((it) => (
-              <div
-                key={it.action}
-                className="flex items-center justify-between text-[13px] text-ink-2"
-              >
+              <div key={it.action} className="flex items-center justify-between text-sm text-ink-2">
                 <span>{it.action}</span>
                 <span className="inline-flex gap-1">
                   {it.keys.map((k, i) => (

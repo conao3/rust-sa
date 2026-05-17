@@ -1,5 +1,5 @@
+import { HelpCircle, Radio } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { HelpCircle } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { Segmented, SegmentedItem } from '#/components/ui/segmented'
 
@@ -28,15 +28,15 @@ function ViewedProgress({ count, total }: { count: number; total: number }) {
   const pct = total === 0 ? 0 : Math.round((count / total) * 100)
   return (
     <div
-      className="flex items-center gap-2 font-mono text-[11.5px] text-mute"
+      className="flex items-center gap-2 font-mono text-xs text-mute"
       title={`${count} / ${total} files viewed`}
     >
       <span className="text-ink">
         {count}/{total}
       </span>
-      <div className="relative w-[100px] h-[5px] bg-bg-card rounded-full overflow-hidden">
+      <div className="relative w-25 h-1 bg-bg-card rounded-full overflow-hidden">
         <i
-          className="absolute top-0 left-0 bottom-0 bg-moss transition-[width] duration-200"
+          className="absolute top-0 left-0 bottom-0 bg-moss transition-all duration-200"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -57,14 +57,12 @@ function ViewTabs({ value, onChange }: { value: View; onChange: (v: View) => voi
             type="button"
             onClick={() => onChange(tab)}
             className={
-              'relative border-0 bg-transparent font-mono text-[11.5px] py-2 px-3 cursor-pointer tracking-[0.02em] ' +
+              'relative border-0 bg-transparent font-mono text-xs py-2 px-3 cursor-pointer tracking-wide ' +
               (active ? 'text-ink' : 'text-mute')
             }
           >
             {tab}
-            {active && (
-              <span className="absolute left-2 right-2 -bottom-px h-[2px] bg-rust" />
-            )}
+            {active && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-rust" />}
           </button>
         )
       })}
@@ -74,10 +72,10 @@ function ViewTabs({ value, onChange }: { value: View; onChange: (v: View) => voi
 
 function BrandMark() {
   return (
-    <span className="inline-flex items-center gap-[2px]" aria-hidden="true">
-      <i className="inline-block w-1 h-[14px] bg-rust" />
-      <i className="inline-block w-1 h-[14px] bg-ink mt-1" />
-      <i className="inline-block w-1 h-[14px] bg-rust opacity-50 -mt-1" />
+    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+      <i className="inline-block w-1 h-3.5 bg-rust" />
+      <i className="inline-block w-1 h-3.5 bg-ink mt-1" />
+      <i className="inline-block w-1 h-3.5 bg-rust opacity-50 -mt-1" />
     </span>
   )
 }
@@ -99,8 +97,8 @@ export function TopBar({
   right,
 }: TopBarProps) {
   return (
-    <header className="flex items-center gap-4 px-4 h-[var(--topbar-h)] bg-bg font-mono text-[12.5px] text-ink-2">
-      <div className="flex items-center gap-2 mr-1 flex-shrink-0 whitespace-nowrap text-ink text-[13px]">
+    <header className="flex items-center gap-4 px-4 h-[var(--topbar-h)] bg-bg font-mono text-xs text-ink-2">
+      <div className="flex items-center gap-2 mr-1 flex-shrink-0 whitespace-nowrap text-ink text-sm">
         <BrandMark />
         <span className="font-medium">rust-sa</span>
       </div>
@@ -112,8 +110,8 @@ export function TopBar({
       </div>
 
       {isLive && (
-        <span className="inline-flex items-center gap-1.5 px-2 py-[3px] bg-moss-deep text-[#f4efe6] rounded-[3px] text-[11px] tracking-[0.02em] flex-shrink-0 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#f4efe6]" />
+        <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-moss-deep text-bg rounded-sm text-xs tracking-wide flex-shrink-0 font-medium">
+          <Radio size={11} aria-hidden="true" />
           live
         </span>
       )}

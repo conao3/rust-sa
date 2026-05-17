@@ -1,3 +1,4 @@
+import { Check, Circle } from 'lucide-react'
 import { cn } from '#/lib/cn'
 
 export interface ViewedCheckProps {
@@ -6,18 +7,19 @@ export interface ViewedCheckProps {
 }
 
 export function ViewedCheck({ isOn, onToggle }: ViewedCheckProps) {
+  const Icon = isOn ? Check : Circle
   return (
     <button
       type="button"
       onClick={onToggle}
       className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-1 rounded-[3px] border font-mono text-[11.5px] cursor-pointer transition-colors',
+        'inline-flex items-center gap-1.5 px-2 py-1 rounded-sm border font-mono text-xs cursor-pointer transition-colors',
         isOn
-          ? 'bg-[var(--moss-soft)] border-moss text-moss'
+          ? 'bg-moss-soft border-moss text-moss'
           : 'bg-bg border-hairline text-mute hover:bg-bg-card',
       )}
     >
-      <span aria-hidden="true">{isOn ? '✓' : '○'}</span>
+      <Icon size={12} aria-hidden="true" />
       <span>viewed</span>
     </button>
   )
