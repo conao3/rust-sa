@@ -134,6 +134,23 @@ function ComparePage() {
   const currentPath = paths[focusedIndex] ?? paths[0]
   const { base, head, separator } = parseSpec(rev)
 
+  const copyAllPrompts = () => {
+    if (comments.length === 0) return
+    const sorted = comments.toSorted(
+      (a, b) => a.path.localeCompare(b.path) || a.startLineNumber - b.startLineNumber,
+    )
+    const text = sorted
+      .map((c) => {
+        const range =
+          c.startLineNumber === c.endLineNumber
+            ? `L${c.startLineNumber}`
+            : `L${c.startLineNumber}–L${c.endLineNumber}`
+        return `Re: ${c.path}:${range}\n${c.body}`
+      })
+      .join('\n\n')
+    navigator.clipboard?.writeText(text)
+  }
+
   useHotkeys(
     [
       { hotkey: { key: '/', shift: true }, callback: () => setHelpOpen((o) => !o) },
@@ -164,7 +181,8 @@ function ComparePage() {
         onViewChange={onViewChange}
         viewedCount={viewedCount}
         totalCount={paths.length}
-        onHelp={() => setHelpOpen(true)}
+        onCopyPrompts={comments.length > 0 ? copyAllPrompts : undefined}
+        copyPromptsLabel={comments.length > 0 ? `copy ${comments.length} prompts` : 'copy prompts'}
         isLive
       />
       <div className="grid grid-cols-[var(--tree-w)_1fr] min-h-0 border-t border-hairline">

@@ -108,7 +108,6 @@ function GraphPage() {
         onViewChange={onViewChange}
         viewedCount={0}
         totalCount={0}
-        onHelp={() => setHelpOpen(true)}
       />
       <div className="border-t border-hairline grid grid-cols-[420px_1fr] min-h-0">
         <aside className="bg-bg-soft border-r border-hairline overflow-y-auto">

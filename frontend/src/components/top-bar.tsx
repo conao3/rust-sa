@@ -1,4 +1,4 @@
-import { Keyboard, Radio } from 'lucide-react'
+import { ClipboardCopy, Radio } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
 import { Segmented, SegmentedItem } from '#/components/ui/segmented'
@@ -19,7 +19,8 @@ export interface TopBarProps {
   onViewChange: (view: View) => void
   viewedCount: number
   totalCount: number
-  onHelp: () => void
+  onCopyPrompts?: () => void
+  copyPromptsLabel?: string
   isLive?: boolean
   right?: ReactNode
 }
@@ -92,7 +93,8 @@ export function TopBar({
   onViewChange,
   viewedCount,
   totalCount,
-  onHelp,
+  onCopyPrompts,
+  copyPromptsLabel = 'copy prompts',
   isLive,
   right,
 }: TopBarProps) {
@@ -143,15 +145,12 @@ export function TopBar({
           <SegmentedItem id="light">light</SegmentedItem>
           <SegmentedItem id="dark">dark</SegmentedItem>
         </Segmented>
-        <Button
-          variant="secondary"
-          size="md"
-          onPress={onHelp}
-          aria-label="Keybindings"
-          className="w-8 px-0 justify-center"
-        >
-          <Keyboard size={16} />
-        </Button>
+        {onCopyPrompts && (
+          <Button variant="secondary" size="md" onPress={onCopyPrompts}>
+            <ClipboardCopy size={16} aria-hidden="true" />
+            {copyPromptsLabel}
+          </Button>
+        )}
       </div>
     </header>
   )
