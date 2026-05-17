@@ -2,6 +2,7 @@ import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import type { GitStatusEntry } from '@pierre/trees'
 import { FileDiff, GitCommitHorizontal, RotateCcw, Split } from 'lucide-react'
 import { useState, type MouseEvent } from 'react'
 import { HelpSheet } from '#/components/help-sheet'
@@ -10,10 +11,16 @@ import { Button } from '#/components/ui/button'
 import { Tag } from '#/components/ui/tag'
 import clsx from 'clsx'
 import { DiffView } from '#/components/diff-view'
+import { FileTreeView } from '#/components/file-tree-view'
 import { GraphColumn } from '#/components/graph-column'
 import { layoutGraph, type GraphNode } from '#/lib/git-graph'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { shortSha } from '#/lib/short-sha'
+
+function gitStatusKey(s: string): GitStatusEntry['status'] {
+  if (s === 'added' || s === 'deleted' || s === 'modified' || s === 'renamed') return s
+  return 'modified'
+}
 
 interface GraphSearch {
   repo?: string
@@ -146,7 +153,13 @@ function GraphPage() {
         </aside>
         <main className="relative overflow-hidden bg-bg">
           {previewSpec ? (
-            <DiffPreview rev={previewSpec} repo={repo} layout={mode} theme={theme} />
+            <DiffPreview
+              rev={previewSpec}
+              repo={repo}
+              layout={mode}
+              theme={theme}
+              commit={head ? null : (commits.find((c) => c.sha === base) ?? null)}
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex flex-col items-center gap-4 text-center px-6">
@@ -189,42 +202,102 @@ function DiffPreview({
   repo,
   layout,
   theme,
+  commit,
 }: {
   rev: string
   repo: string
   layout: Mode
   theme: Theme
+  commit: Commit | null
 }) {
   const { data, loading, error } = useQuery<{ files: PreviewFile[] }>(PREVIEW_FILES_QUERY, {
     variables: { rev, repo },
     fetchPolicy: 'cache-and-network',
   })
   const files = data?.files ?? []
+  const fileEntries = files.map((f) => ({ path: f.path, status: gitStatusKey(f.status) }))
+  const paths = fileEntries.map((f) => f.path)
+
+  let body: React.ReactNode
   if (loading && files.length === 0) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-mute">
+    body = (
+      <div className="h-full flex items-center justify-center font-mono text-xs text-mute">
         loading diff…
       </div>
     )
-  }
-  if (error) {
-    return (
-      <div className="absolute inset-0 flex items-start justify-center px-6 pt-10 font-mono text-xs text-crimson">
+  } else if (error) {
+    body = (
+      <div className="h-full flex items-start justify-center px-6 pt-10 font-mono text-xs text-crimson">
         {error.message}
       </div>
     )
-  }
-  if (files.length === 0) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-mute">
+  } else if (files.length === 0) {
+    body = (
+      <div className="h-full flex items-center justify-center font-mono text-xs text-mute">
         no changes in this range
       </div>
     )
-  }
-  return (
-    <div className="absolute inset-0 pb-20 overflow-y-auto">
+  } else {
+    body = (
       <DiffView rev={rev} refreshKey={0} files={files} repo={repo} layout={layout} theme={theme} />
+    )
+  }
+
+  return (
+    <div className="absolute inset-0 pb-20 grid grid-cols-[var(--tree-w)_1fr] min-h-0">
+      <aside className="bg-bg-soft border-r border-hairline min-h-0 overflow-hidden">
+        <FileTreeView
+          paths={paths}
+          gitStatus={fileEntries}
+          header={<PreviewTreeHeader count={paths.length} />}
+        />
+      </aside>
+      <div className="overflow-y-auto min-w-0">
+        {commit && <CommitMeta commit={commit} />}
+        {body}
+      </div>
     </div>
+  )
+}
+
+function PreviewTreeHeader({ count }: { count: number }) {
+  return (
+    <div className="px-3 pt-4 pb-3 border-b border-hairline flex items-center justify-between font-mono text-xs uppercase tracking-widest text-mute">
+      <span>files</span>
+      <span className="text-ink normal-case tracking-normal text-xs">{count}</span>
+    </div>
+  )
+}
+
+function CommitMeta({ commit }: { commit: Commit }) {
+  const refParts = commit.refs
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return (
+    <header className="px-5 pt-5 pb-4 border-b border-hairline bg-bg">
+      <div className="flex items-baseline gap-3 font-mono text-xs text-mute flex-wrap">
+        <span className="text-rust">{commit.short}</span>
+        <span>{commit.author}</span>
+        <span>·</span>
+        <span>{commit.when}</span>
+      </div>
+      <h2 className="mt-2 m-0 font-serif text-xl tracking-tight text-ink">{commit.message}</h2>
+      {refParts.length > 0 && (
+        <div className="mt-2 inline-flex flex-wrap gap-1">
+          {refParts.map((p) => {
+            const isHeadRef = p.includes('HEAD')
+            const isTag = p.startsWith('tag:')
+            const label = isTag ? p.replace('tag: ', '') : p.replace('HEAD -> ', '')
+            return (
+              <Tag key={p} tone={isHeadRef ? 'rust' : isTag ? 'neutral' : 'moss'}>
+                {label}
+              </Tag>
+            )
+          })}
+        </div>
+      )}
+    </header>
   )
 }
 
