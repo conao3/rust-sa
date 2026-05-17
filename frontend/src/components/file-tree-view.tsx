@@ -1,6 +1,6 @@
-import { FileTree, useFileTree } from '@pierre/trees/react'
+import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react'
 import type { GitStatusEntry } from '@pierre/trees'
-import { useEffect, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 
 export interface FileTreeViewProps {
   paths: string[]
@@ -15,12 +15,16 @@ export interface FileTreeViewProps {
 
 const THEME_STYLE: CSSProperties = {
   height: '100%',
+  paddingBlockStart: '8px',
   ['--trees-bg-override' as string]: 'var(--bg-soft)',
   ['--trees-fg-override' as string]: 'var(--ink)',
+  ['--trees-fg-muted-override' as string]: 'var(--mute)',
   ['--trees-border-color-override' as string]: 'var(--hairline)',
   ['--trees-selected-bg-override' as string]: 'var(--bg-strong)',
   ['--trees-hover-bg-override' as string]: 'var(--bg-card)',
   ['--trees-muted-fg-override' as string]: 'var(--mute)',
+  ['--trees-search-bg-override' as string]: 'var(--bg)',
+  ['--trees-search-fg-override' as string]: 'var(--ink)',
 }
 
 export function FileTreeView({
@@ -37,8 +41,13 @@ export function FileTreeView({
     initialExpansion,
     paths,
     search,
-    onSelectionChange,
   })
+  const selection = useFileTreeSelection(model)
+  const onSelectionChangeRef = useRef(onSelectionChange)
+  onSelectionChangeRef.current = onSelectionChange
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selection)
+  }, [selection])
 
   useEffect(() => {
     model.resetPaths(paths)
