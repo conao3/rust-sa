@@ -1,5 +1,5 @@
 import { PatchDiff } from '@pierre/diffs/react'
-import { useCallback, useMemo, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { CommentComposer } from '#/components/comment-composer'
 import { CommentThread } from '#/components/comment-thread'
 import type { Comment, Side } from '#/lib/comments'
@@ -14,10 +14,18 @@ interface SelectedLineRange {
   endSide?: Side
 }
 
-export interface DiffViewFile {
+interface DiffViewFile {
   path: string
   additions?: number
   deletions?: number
+}
+
+interface AddCommentInput {
+  path: string
+  side: Side
+  startLineNumber: number
+  endLineNumber: number
+  body: string
 }
 
 export interface DiffViewProps {
@@ -31,7 +39,7 @@ export interface DiffViewProps {
   className?: string
   comments?: Comment[]
   renderHeaderMetadata?: RenderHeaderMetadata
-  onAddComment?: (input: { path: string; side: Side; lineNumber: number; body: string }) => void
+  onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
 }
 
@@ -85,8 +93,14 @@ interface FileBlockProps {
   theme: 'light' | 'dark'
   comments?: Comment[]
   renderHeaderMetadata?: RenderHeaderMetadata
-  onAddComment?: (input: { path: string; side: Side; lineNumber: number; body: string }) => void
+  onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
+}
+
+interface ComposingState {
+  side: Side
+  startLineNumber: number
+  endLineNumber: number
 }
 
 function FileBlock({
@@ -106,83 +120,116 @@ function FileBlock({
 }: FileBlockProps) {
   const { patch, loading, error } = useDiff(rev, repo, refreshKey, path, initialPatch)
   const reservedHeight = Math.max(240, (additions + deletions + 30) * 22)
-  const [composing, setComposing] = useState<{ side: Side; lineNumber: number } | null>(null)
+  const [composing, setComposing] = useState<ComposingState | null>(null)
+  const [composerBody, setComposerBody] = useState('')
+  const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const onGutterUtilityClick = useCallback(
-    (range: SelectedLineRange) => {
-      if (!onAddComment) return
-      setComposing({ side: (range.side ?? 'additions') as Side, lineNumber: range.start })
-    },
-    [onAddComment],
-  )
-
-  const options = useMemo<PatchDiffProps['options']>(
-    () => ({
-      diffStyle: layout,
-      theme: theme === 'dark' ? 'github-dark' : 'github-light',
-      enableGutterUtility: true,
-      onGutterUtilityClick,
-    }),
-    [layout, theme, onGutterUtilityClick],
-  )
-
-  const annotations = useMemo(() => {
-    const grouped = new Map<string, Comment[]>()
-    for (const c of comments) {
-      const key = `${c.side}:${c.lineNumber}`
-      const arr = grouped.get(key) ?? []
-      arr.push(c)
-      grouped.set(key, arr)
+  useEffect(() => {
+    const onDocPointerDown = (e: PointerEvent) => {
+      const eventPath = e.composedPath() as Element[]
+      const insideContainer =
+        containerRef.current != null && eventPath.includes(containerRef.current)
+      const insideComposer = eventPath.some(
+        (el) => el instanceof HTMLElement && el.hasAttribute('data-rust-sa-composer'),
+      )
+      const onGutterUtility = eventPath.some(
+        (el) => el instanceof HTMLElement && el.hasAttribute('data-utility-button'),
+      )
+      if (composing && !insideComposer && !onGutterUtility && !composerBody.trim()) {
+        setComposing(null)
+        setComposerBody('')
+      }
+      if (selectedLines && !insideContainer) {
+        setSelectedLines(null)
+      }
     }
-    return [
-      ...[...grouped.entries()].map(([key, list]) => {
-        const [side, ln] = key.split(':')
-        return {
-          side: side as Side,
-          lineNumber: Number(ln),
-          metadata: { kind: 'thread' as const, comments: list },
-        }
-      }),
-      ...(composing
-        ? [
-            {
-              side: composing.side,
-              lineNumber: composing.lineNumber,
-              metadata: { kind: 'composer' as const },
-            },
-          ]
-        : []),
-    ]
-  }, [comments, composing])
+    document.addEventListener('pointerdown', onDocPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onDocPointerDown, true)
+  }, [composing, composerBody, selectedLines])
 
-  const renderAnnotation = useCallback(
-    (ann: unknown) => {
-      const m = (ann as { metadata?: unknown }).metadata
-      if (!m || typeof m !== 'object') return null
-      if ((m as { kind: string }).kind === 'thread') {
-        const list = (m as { comments: Comment[] }).comments
-        return <CommentThread comments={list} onDelete={onDeleteComment} />
+  const onGutterUtilityClick = (range: SelectedLineRange) => {
+    if (!onAddComment) return
+    const side = (range.side ?? 'additions') as Side
+    const [start, end] =
+      range.start <= range.end ? [range.start, range.end] : [range.end, range.start]
+    setComposing({ side, startLineNumber: start, endLineNumber: end })
+    setComposerBody('')
+  }
+
+  const options: PatchDiffProps['options'] = {
+    diffStyle: layout,
+    theme: theme === 'dark' ? 'github-dark' : 'github-light',
+    enableGutterUtility: true,
+    enableLineSelection: true,
+    onGutterUtilityClick,
+    onLineSelectionStart: setSelectedLines,
+    onLineSelectionChange: setSelectedLines,
+    onLineSelectionEnd: setSelectedLines,
+    onLineSelected: setSelectedLines,
+  }
+
+  const grouped = new Map<string, Comment[]>()
+  for (const c of comments) {
+    const key = `${c.side}:${c.startLineNumber}:${c.endLineNumber}`
+    const arr = grouped.get(key) ?? []
+    arr.push(c)
+    grouped.set(key, arr)
+  }
+  const annotations = [
+    ...[...grouped.entries()].map(([key, list]) => {
+      const [side, , endLn] = key.split(':')
+      return {
+        side: side as Side,
+        lineNumber: Number(endLn),
+        metadata: { kind: 'thread' as const, comments: list },
       }
-      if ((m as { kind: string }).kind === 'composer' && composing) {
-        return (
-          <CommentComposer
-            onCancel={() => setComposing(null)}
-            onSubmit={(body) => {
-              onAddComment?.({
-                path,
-                side: composing.side,
-                lineNumber: composing.lineNumber,
-                body,
-              })
-              setComposing(null)
-            }}
-          />
-        )
-      }
-      return null
-    },
-    [composing, onAddComment, onDeleteComment, path],
-  )
+    }),
+    ...(composing
+      ? [
+          {
+            side: composing.side,
+            lineNumber: composing.endLineNumber,
+            metadata: { kind: 'composer' as const },
+          },
+        ]
+      : []),
+  ]
+
+  const renderAnnotation = (ann: unknown) => {
+    const m = (ann as { metadata?: unknown }).metadata
+    if (!m || typeof m !== 'object') return null
+    if ((m as { kind: string }).kind === 'thread') {
+      const list = (m as { comments: Comment[] }).comments
+      return <CommentThread comments={list} onDelete={onDeleteComment} />
+    }
+    if ((m as { kind: string }).kind === 'composer' && composing) {
+      return (
+        <CommentComposer
+          startLineNumber={composing.startLineNumber}
+          endLineNumber={composing.endLineNumber}
+          value={composerBody}
+          onChange={setComposerBody}
+          onCancel={() => {
+            setComposing(null)
+            setComposerBody('')
+          }}
+          onSubmit={(body) => {
+            onAddComment?.({
+              path,
+              side: composing.side,
+              startLineNumber: composing.startLineNumber,
+              endLineNumber: composing.endLineNumber,
+              body,
+            })
+            setComposing(null)
+            setComposerBody('')
+          }}
+        />
+      )
+    }
+    return null
+  }
 
   const wrapperStyle: React.CSSProperties = {
     minHeight: reservedHeight,
@@ -193,7 +240,7 @@ function FileBlock({
   if (loading && !patch) {
     return (
       <div
-        className="px-4 py-3 font-mono text-[12px] text-mute border-b border-hairline-soft"
+        className="px-4 py-3 font-mono text-xs text-mute border-b border-hairline-soft"
         style={wrapperStyle}
       >
         {path} — loading…
@@ -202,18 +249,19 @@ function FileBlock({
   }
   if (error) {
     return (
-      <div className="px-4 py-3 font-mono text-[12px] text-crimson border-b border-hairline-soft">
+      <div className="px-4 py-3 font-mono text-xs text-crimson border-b border-hairline-soft">
         {path} — {error.message}
       </div>
     )
   }
 
   return (
-    <div style={wrapperStyle}>
+    <div ref={containerRef} style={wrapperStyle}>
       <PatchDiff
         patch={patch}
         options={options}
         lineAnnotations={annotations}
+        selectedLines={selectedLines}
         renderHeaderMetadata={renderHeaderMetadata}
         renderAnnotation={renderAnnotation}
       />

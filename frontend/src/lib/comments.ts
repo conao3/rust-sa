@@ -6,7 +6,8 @@ export interface Comment {
   id: string
   path: string
   side: Side
-  lineNumber: number
+  startLineNumber: number
+  endLineNumber: number
   author: string
   body: string
   createdAt: string
@@ -18,13 +19,36 @@ export interface CommentsState {
   remove: (id: string) => void
 }
 
+interface StoredCommentV1 extends Omit<Comment, 'startLineNumber' | 'endLineNumber'> {
+  lineNumber?: number
+  startLineNumber?: number
+  endLineNumber?: number
+}
+
+function migrate(raw: StoredCommentV1[]): Comment[] {
+  return raw.map((c) => {
+    const start = c.startLineNumber ?? c.lineNumber ?? 0
+    const end = c.endLineNumber ?? c.lineNumber ?? start
+    return {
+      id: c.id,
+      path: c.path,
+      side: c.side,
+      author: c.author,
+      body: c.body,
+      createdAt: c.createdAt,
+      startLineNumber: start,
+      endLineNumber: end,
+    }
+  })
+}
+
 export function useComments(rev: string): CommentsState {
   const key = `rust-sa:comments:${rev}`
   const [comments, setComments] = useState<Comment[]>(() => {
     if (typeof window === 'undefined') return []
     try {
       const raw = window.localStorage.getItem(key)
-      return raw ? (JSON.parse(raw) as Comment[]) : []
+      return raw ? migrate(JSON.parse(raw) as StoredCommentV1[]) : []
     } catch {
       return []
     }
