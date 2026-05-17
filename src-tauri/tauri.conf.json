@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../frontend/.output/public",
     "devUrl": "https://sa.localhost",
-    "beforeBuildCommand": "make -C ../frontend build"
+    "beforeBuildCommand": "make -C frontend build"
   },
   "app": {
     "windows": [
