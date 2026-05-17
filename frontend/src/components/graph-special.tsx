@@ -54,6 +54,7 @@ export function SpecialRows({
           <button
             key={id}
             type="button"
+            data-spec={id}
             onClick={(e) => onSelect(e, id)}
             onDoubleClick={() => onDoubleSelect(id)}
             style={{ height: rowHeight }}

@@ -112,6 +112,7 @@ export function RefSection({
               <button
                 key={r.name}
                 type="button"
+                data-spec={r.name}
                 onClick={(e) => onClick(e, r.name)}
                 onDoubleClick={() => onDoubleClick(r.name)}
                 style={{ height: rowHeight }}

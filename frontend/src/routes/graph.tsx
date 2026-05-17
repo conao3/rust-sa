@@ -34,6 +34,12 @@ import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
 import { shortSha } from '#/lib/short-sha'
 
+function specAtPoint(clientX: number, clientY: number): string | null {
+  const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null
+  const row = el?.closest('[data-spec]') as HTMLElement | null
+  return row?.getAttribute('data-spec') ?? null
+}
+
 function gitStatusKey(s: string): GitStatusEntry['status'] {
   if (s === 'added' || s === 'deleted' || s === 'modified' || s === 'renamed') return s
   return 'modified'
@@ -175,23 +181,61 @@ function GraphPage() {
     { preventDefault: true, ignoreInputs: true },
   )
 
+  const dragStartRef = useRef<string | null>(null)
+  const draggedRef = useRef(false)
+
+  const consumeDragFlag = (): boolean => {
+    if (draggedRef.current) {
+      draggedRef.current = false
+      return true
+    }
+    return false
+  }
+
   const onRowClick = (e: MouseEvent, sha: string) => {
+    if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(sha)
     else setBase(sha)
   }
 
   const onSpecialClick = (e: MouseEvent, id: SpecialId) => {
+    if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(id)
     else setBase(id)
   }
 
   const onRefClick = (e: MouseEvent, name: string) => {
+    if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(name)
     else setBase(name)
   }
 
   const openSpecDiff = (spec: string) => {
     navigate({ to: '/compare/$', params: { _splat: spec }, search: { repo } })
+  }
+
+  const onPaneDown = (e: MouseEvent) => {
+    if (e.button !== 0) return
+    if (e.ctrlKey || e.metaKey) return
+    const sha = specAtPoint(e.clientX, e.clientY)
+    if (!sha) return
+    dragStartRef.current = sha
+    draggedRef.current = false
+  }
+
+  const onPaneMove = (e: MouseEvent) => {
+    const start = dragStartRef.current
+    if (!start) return
+    const sha = specAtPoint(e.clientX, e.clientY)
+    if (sha && sha !== start) {
+      draggedRef.current = true
+      setBase(start)
+      setHead(sha)
+    }
+  }
+
+  const onPaneUp = () => {
+    dragStartRef.current = null
   }
 
   const baseIsSpecial = isSpecial(base)
@@ -235,7 +279,13 @@ function GraphPage() {
         className="border-t border-hairline grid min-h-0"
         style={{ gridTemplateColumns: `${commitsW}px auto 1fr` }}
       >
-        <aside className="bg-bg-soft border-r border-hairline overflow-y-auto min-w-0">
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+        <aside
+          className="bg-bg-soft border-r border-hairline overflow-y-auto min-w-0 select-none"
+          onMouseDown={onPaneDown}
+          onMouseMove={onPaneMove}
+          onMouseUp={onPaneUp}
+        >
           <div className="sticky top-0 z-10 bg-bg-soft border-b border-hairline-soft px-4 pt-4 pb-2 font-mono text-xs uppercase tracking-widest text-mute flex items-center gap-1.5">
             <GitCommitHorizontal size={16} aria-hidden="true" />
             commits
@@ -564,6 +614,7 @@ function CommitRow({
   return (
     <button
       type="button"
+      data-spec={commit.sha}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       style={{ height: ROW_HEIGHT }}
