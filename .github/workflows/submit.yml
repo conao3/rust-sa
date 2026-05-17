@@ -55,7 +55,11 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - run: |
-          sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" src-tauri/Cargo.toml
+          NEW="${{ steps.bump.outputs.new_version }}"
+          sed -i "s/^version = \".*\"/version = \"$NEW\"/" src-tauri/Cargo.toml
+          # Keep src-tauri/Cargo.lock in sync so cargo publish doesn't
+          # try to rewrite it on the publish job and trip its dirty check.
+          sed -i "/^name = \"conao3-sa\"\$/{n;s/^version = \".*\"/version = \"$NEW\"/;}" src-tauri/Cargo.lock
           cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version=1 > /dev/null
       - run: |
           git config user.name "github-actions[bot]"
@@ -100,11 +104,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-publish-
             ${{ runner.os }}-cargo-
-      - run: cargo publish --no-verify --dry-run
+      # --allow-dirty is required because the SPA bundle in src-tauri/dist
+      # is built fresh by `make dist` above and intentionally gitignored;
+      # it is included in the package via Cargo.toml's `include` list.
+      - run: cargo publish --no-verify --dry-run --allow-dirty
         working-directory: src-tauri
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
-      - run: cargo publish --no-verify
+      - run: cargo publish --no-verify --allow-dirty
         working-directory: src-tauri
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
