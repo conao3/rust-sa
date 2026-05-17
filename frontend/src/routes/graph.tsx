@@ -113,7 +113,7 @@ function GraphPage() {
       <div className="border-t border-hairline grid grid-cols-[420px_1fr] min-h-0">
         <aside className="bg-bg-soft border-r border-hairline overflow-y-auto">
           <div className="px-4 pt-4 pb-2 font-mono text-xs uppercase tracking-widest text-mute inline-flex items-center gap-1.5">
-            <GitCommitHorizontal size={11} aria-hidden="true" />
+            <GitCommitHorizontal size={16} aria-hidden="true" />
             commits
           </div>
           {loading && <div className="px-4 py-2 font-mono text-xs text-mute">loading…</div>}
@@ -233,16 +233,16 @@ function GraphSummary({
         {head ?? '—'}
       </span>
       <Button variant="ghost" size="sm" onPress={onToggleThreeDot}>
-        <Split size={11} aria-hidden="true" />
+        <Split size={16} aria-hidden="true" />
         {threeDot ? 'three-dot' : 'two-dot'}
       </Button>
       <span className="flex-1" />
       <Button variant="ghost" size="sm" onPress={onClear}>
-        <RotateCcw size={11} aria-hidden="true" />
+        <RotateCcw size={16} aria-hidden="true" />
         clear
       </Button>
       <Button variant="primary" size="sm" onPress={onOpen} isDisabled={!base}>
-        <FileDiff size={11} aria-hidden="true" />
+        <FileDiff size={16} aria-hidden="true" />
         open diff
       </Button>
     </div>

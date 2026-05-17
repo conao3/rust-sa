@@ -34,7 +34,7 @@ export function CommentThread({ comments, onDelete }: CommentThreadProps) {
           >
             <div className="flex items-center gap-1.5 font-mono text-xs text-mute">
               <span className={cnAuthor(isClaude) + ' inline-flex items-center gap-1'}>
-                {isClaude && <Sparkles size={11} aria-hidden="true" />}
+                {isClaude && <Sparkles size={16} aria-hidden="true" />}
                 {c.author}
               </span>
               <span>· {timeAgo(c.createdAt)}</span>
@@ -47,12 +47,12 @@ export function CommentThread({ comments, onDelete }: CommentThreadProps) {
                 size="sm"
                 onPress={() => navigator.clipboard?.writeText(promptFor(c))}
               >
-                <Copy size={11} aria-hidden="true" />
+                <Copy size={16} aria-hidden="true" />
                 copy prompt
               </Button>
               {onDelete && (
                 <Button variant="ghost" size="sm" onPress={() => onDelete(c.id)}>
-                  <Trash2 size={11} aria-hidden="true" />
+                  <Trash2 size={16} aria-hidden="true" />
                   delete
                 </Button>
               )}

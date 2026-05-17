@@ -87,7 +87,7 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
               <EntryRow
                 name=".."
                 isDir
-                icon={<ArrowUp size={12} aria-hidden="true" />}
+                icon={<ArrowUp size={16} aria-hidden="true" />}
                 onActivate={() => setCwd(listing.parent)}
               />
             )}
@@ -107,7 +107,7 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
               {listing?.path ?? '—'}
             </span>
             <Button variant="ghost" size="sm" onPress={close}>
-              <X size={11} aria-hidden="true" />
+              <X size={16} aria-hidden="true" />
               cancel
             </Button>
             <Button
@@ -121,7 +121,7 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
               }}
               isDisabled={!listing?.path}
             >
-              <Check size={11} aria-hidden="true" />
+              <Check size={16} aria-hidden="true" />
               select this folder
             </Button>
           </div>
@@ -141,7 +141,7 @@ function Breadcrumb({ path, onNavigate }: { path: string; onNavigate: (p: string
         onClick={() => onNavigate('/')}
         aria-label="Root"
       >
-        <Home size={11} aria-hidden="true" />
+        <Home size={16} aria-hidden="true" />
       </button>
       {segments.map((seg, i) => {
         const full = '/' + segments.slice(0, i + 1).join('/')
@@ -178,9 +178,9 @@ function EntryRow({
   onActivate: () => void
 }) {
   const fallbackIcon = isDir ? (
-    <Folder size={12} aria-hidden="true" className={isGitRepo ? 'text-rust' : ''} />
+    <Folder size={16} aria-hidden="true" className={isGitRepo ? 'text-rust' : ''} />
   ) : (
-    <File size={12} aria-hidden="true" />
+    <File size={16} aria-hidden="true" />
   )
   return (
     <button
@@ -198,7 +198,7 @@ function EntryRow({
       <span className={cn(isGitRepo && 'text-rust')}>{name}</span>
       {isGitRepo && (
         <span className="ml-auto inline-flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-rust">
-          <GitBranch size={10} aria-hidden="true" />
+          <GitBranch size={16} aria-hidden="true" />
           git
         </span>
       )}

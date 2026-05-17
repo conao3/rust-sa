@@ -34,7 +34,7 @@ export function Sheet({ title, hint, children, className, ...rest }: SheetProps)
                   onClick={close}
                   className="ml-auto inline-flex items-center justify-center w-7 h-7 rounded-sm text-mute hover:text-ink hover:bg-bg-card cursor-pointer"
                 >
-                  <X size={14} aria-hidden="true" />
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
               <div className="overflow-y-auto px-5 pt-4 pb-5">{children}</div>

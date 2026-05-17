@@ -111,7 +111,7 @@ export function TopBar({
 
       {isLive && (
         <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-moss-deep text-bg rounded-sm text-xs tracking-wide flex-shrink-0 font-medium">
-          <Radio size={11} aria-hidden="true" />
+          <Radio size={16} aria-hidden="true" />
           live
         </span>
       )}

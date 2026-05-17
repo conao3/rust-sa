@@ -19,7 +19,7 @@ export function ViewedCheck({ isOn, onToggle }: ViewedCheckProps) {
           : 'bg-bg border-hairline text-mute hover:bg-bg-card',
       )}
     >
-      <Icon size={12} aria-hidden="true" />
+      <Icon size={16} aria-hidden="true" />
       <span>viewed</span>
     </button>
   )

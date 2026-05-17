@@ -116,7 +116,7 @@ function HomePage() {
                       autoFocus
                     />
                     <Button variant="secondary" size="md" onPress={() => setPickerOpen(true)}>
-                      <Folder size={12} aria-hidden="true" />
+                      <Folder size={16} aria-hidden="true" />
                       browse
                     </Button>
                   </div>
@@ -143,11 +143,11 @@ function HomePage() {
               {(hasRepo) => (
                 <div className="flex items-center gap-2 mt-1">
                   <Button type="submit" variant="primary" isDisabled={!hasRepo}>
-                    <FileDiff size={12} aria-hidden="true" />
+                    <FileDiff size={16} aria-hidden="true" />
                     open diff
                   </Button>
                   <Button variant="secondary" onPress={openGraph} isDisabled={!hasRepo}>
-                    <GitGraph size={12} aria-hidden="true" />
+                    <GitGraph size={16} aria-hidden="true" />
                     open graph
                   </Button>
                 </div>
@@ -231,9 +231,9 @@ function HomePage() {
             target="_blank"
             rel="noreferrer"
           >
-            <GitFork size={11} aria-hidden="true" />
+            <GitFork size={16} aria-hidden="true" />
             github.com/conao3/rust-sa
-            <ExternalLink size={10} aria-hidden="true" />
+            <ExternalLink size={16} aria-hidden="true" />
           </a>
         </div>
       </footer>

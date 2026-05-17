@@ -53,11 +53,11 @@ export function CommentComposer({
         <div className="flex items-center gap-2">
           <span className="flex-1 font-mono text-xs text-faint">⌘↵ submit · esc cancel</span>
           <Button variant="ghost" size="sm" onPress={onCancel}>
-            <X size={11} aria-hidden="true" />
+            <X size={16} aria-hidden="true" />
             cancel
           </Button>
           <Button variant="primary" size="sm" onPress={submit} isDisabled={!value.trim()}>
-            <Send size={11} aria-hidden="true" />
+            <Send size={16} aria-hidden="true" />
             submit
           </Button>
         </div>
