@@ -255,6 +255,15 @@ function GraphPage() {
         : base
     : null
 
+  const rangeShas = (() => {
+    if (!base || !head || anySpecial) return null as Set<string> | null
+    const i = commits.findIndex((c) => c.sha === base)
+    const j = commits.findIndex((c) => c.sha === head)
+    if (i < 0 || j < 0) return null
+    const [lo, hi] = i < j ? [i, j] : [j, i]
+    return new Set(commits.slice(lo + 1, hi).map((c) => c.sha))
+  })()
+
   const openDiff = () => {
     if (!previewSpec) return
     navigate({ to: '/compare/$', params: { _splat: previewSpec }, search: { repo } })
@@ -331,6 +340,7 @@ function GraphPage() {
             commits={commits}
             base={base}
             head={head}
+            rangeShas={rangeShas}
             onRowClick={onRowClick}
             onRowDoubleClick={openSpecDiff}
           />
@@ -558,12 +568,14 @@ function CommitList({
   commits,
   base,
   head,
+  rangeShas,
   onRowClick,
   onRowDoubleClick,
 }: {
   commits: Commit[]
   base: string | null
   head: string | null
+  rangeShas: Set<string> | null
   onRowClick: (e: MouseEvent, sha: string) => void
   onRowDoubleClick: (sha: string) => void
 }) {
@@ -584,6 +596,7 @@ function CommitList({
           totalLanes={totalLanes}
           isBase={base === c.sha}
           isHead={head === c.sha}
+          isInRange={rangeShas?.has(c.sha) ?? false}
           onClick={(e) => onRowClick(e, c.sha)}
           onDoubleClick={() => onRowDoubleClick(c.sha)}
         />
@@ -599,6 +612,7 @@ function CommitRow({
   totalLanes,
   isBase,
   isHead,
+  isInRange,
   onClick,
   onDoubleClick,
 }: {
@@ -608,6 +622,7 @@ function CommitRow({
   totalLanes: number
   isBase: boolean
   isHead: boolean
+  isInRange: boolean
   onClick: (e: MouseEvent) => void
   onDoubleClick: () => void
 }) {
@@ -622,6 +637,7 @@ function CommitRow({
         'w-full text-left flex items-center gap-2 pr-3 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
         isBase && 'bg-rust-soft',
         isHead && 'bg-moss-soft',
+        !isBase && !isHead && isInRange && 'bg-bg-strong/60',
       )}
     >
       <GraphColumn node={node} nextNode={nextNode} rowHeight={ROW_HEIGHT} totalLanes={totalLanes} />
