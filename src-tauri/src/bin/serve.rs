@@ -8,14 +8,15 @@ use axum::{
     Extension, Router,
 };
 use futures::stream::Stream;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
     convert::Infallible,
+    io::Write,
     net::SocketAddr,
     path::{Path, PathBuf},
+    process::Stdio,
     sync::{Mutex, OnceLock},
     time::Duration,
 };
@@ -488,30 +489,49 @@ fn build_router(schema: AppSchema) -> Router {
         )
 }
 
-fn build_repo_ignore(repo: &Path) -> Gitignore {
-    let mut builder = GitignoreBuilder::new(repo);
-    let _ = builder.add(repo.join(".gitignore"));
-    let _ = builder.add(repo.join(".git/info/exclude"));
-    builder.build().unwrap_or_else(|_| Gitignore::empty())
-}
+fn any_unignored(repo_root: &Path, paths: &[PathBuf]) -> bool {
+    let candidates: Vec<&PathBuf> = paths
+        .iter()
+        .filter(|p| {
+            let s = p.to_string_lossy();
+            !s.contains("/.git/") && !s.ends_with("/.git")
+        })
+        .collect();
+    if candidates.is_empty() {
+        return false;
+    }
 
-fn is_interesting(repo: &Path, path: &Path, repo_gi: &Gitignore, global_gi: &Gitignore) -> bool {
-    let s = path.to_string_lossy();
-    if s.contains("/.git/") || s.ends_with("/.git") {
-        return false;
-    }
-    let rel = path.strip_prefix(repo).unwrap_or(path);
-    let is_dir = path.is_dir();
-    if repo_gi.matched_path_or_any_parents(rel, is_dir).is_ignore() {
-        return false;
-    }
-    if global_gi
-        .matched_path_or_any_parents(rel, is_dir)
-        .is_ignore()
+    let mut child = match std::process::Command::new("git")
+        .current_dir(repo_root)
+        .args(["check-ignore", "-z", "--no-index", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
     {
-        return false;
+        Ok(c) => c,
+        Err(_) => return true,
+    };
+    {
+        let stdin = match child.stdin.as_mut() {
+            Some(s) => s,
+            None => return true,
+        };
+        let mut buf = Vec::new();
+        for p in &candidates {
+            buf.extend_from_slice(p.to_string_lossy().as_bytes());
+            buf.push(0);
+        }
+        if stdin.write_all(&buf).is_err() {
+            return true;
+        }
     }
-    true
+    let output = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(_) => return true,
+    };
+    let ignored_count = output.stdout.iter().filter(|&&b| b == 0).count();
+    ignored_count < candidates.len()
 }
 
 fn spawn_watcher(
@@ -519,15 +539,11 @@ fn spawn_watcher(
     root: PathBuf,
 ) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     let watcher_tx = tx.clone();
-    let repo_gi = build_repo_ignore(&root);
-    let (global_gi, _) = Gitignore::global();
     let watch_root = root.clone();
     let mut debouncer = new_debouncer(Duration::from_millis(250), move |res: DebounceEventResult| {
         if let Ok(events) = res {
-            if events
-                .iter()
-                .any(|e| is_interesting(&watch_root, &e.path, &repo_gi, &global_gi))
-            {
+            let paths: Vec<PathBuf> = events.iter().map(|e| e.path.clone()).collect();
+            if any_unignored(&watch_root, &paths) {
                 let _ = watcher_tx.send("changed".to_string());
             }
         }
