@@ -9,6 +9,7 @@ import {
   GitGraph,
   Palette,
   Settings,
+  Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { BrandMark } from '#/components/brand-mark'
@@ -46,6 +47,12 @@ function pushRecent(entry: RecentEntry): RecentEntry[] {
   const trimmed = next.slice(0, 8)
   window.localStorage.setItem(RECENTS_KEY, JSON.stringify(trimmed))
   return trimmed
+}
+
+function removeRecent(repo: string): RecentEntry[] {
+  const next = loadRecents().filter((r) => r.repo !== repo)
+  window.localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
+  return next
 }
 
 function HomePage() {
@@ -146,18 +153,31 @@ function HomePage() {
             <div className="font-mono text-xs uppercase tracking-widest text-mute">recent</div>
             <ul className="flex flex-col border border-hairline rounded-sm divide-y divide-hairline-soft overflow-hidden">
               {recents.map((r) => (
-                <li key={`${r.repo}@${r.visitedAt}`}>
+                <li
+                  key={`${r.repo}@${r.visitedAt}`}
+                  className="group flex items-center hover:bg-bg-card"
+                >
                   <button
                     type="button"
                     onClick={() => {
                       form.setFieldValue('repo', r.repo)
                       goBrowse(r.repo)
                     }}
-                    className="w-full text-left px-3 py-2 font-mono text-xs hover:bg-bg-card flex items-center gap-3 cursor-pointer"
+                    className="flex-1 text-left px-3 py-2 font-mono text-xs flex items-center gap-3 cursor-pointer min-w-0"
                   >
                     <Eye size={14} aria-hidden="true" className="text-mute flex-shrink-0" />
                     <span className="text-ink-2 truncate">{r.repo}</span>
-                    <span className="ml-auto text-mute text-xs">{timeAgo(r.visitedAt)}</span>
+                    <span className="ml-auto text-mute text-xs flex-shrink-0">
+                      {timeAgo(r.visitedAt)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecents(removeRecent(r.repo))}
+                    aria-label={`Remove ${r.repo} from recents`}
+                    className="px-3 py-2 text-faint hover:text-crimson cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
                   </button>
                 </li>
               ))}
