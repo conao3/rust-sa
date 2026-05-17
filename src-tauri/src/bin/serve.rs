@@ -496,6 +496,17 @@ const IGNORED_SEGMENTS: &[&str] = &[
     "/.nitro/",
     "/dist/",
     "/.direnv/",
+    "/.next/",
+    "/.turbo/",
+    "/.cache/",
+    "/.parcel-cache/",
+    "/.svelte-kit/",
+    "/.docusaurus/",
+    "/.firebase/",
+    "/coverage/",
+    "/.idea/",
+    "/.vscode/",
+    "/.DS_Store",
 ];
 
 fn is_interesting(path: &std::path::Path) -> bool {
