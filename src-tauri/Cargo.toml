@@ -1,6 +1,6 @@
 [package]
 name = "conao3-sa"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 default-run = "sa"
 description = "Local git diff reviewer with a TanStack Start frontend and an axum/async-graphql backend."
@@ -10,6 +10,18 @@ homepage = "https://github.com/conao3/rust-sa"
 readme = "../README.md"
 keywords = ["git", "diff", "review", "tauri"]
 categories = ["development-tools", "command-line-utilities"]
+include = [
+  "src/**/*",
+  "build.rs",
+  "Cargo.toml",
+  "Cargo.lock",
+  "tauri.conf.json",
+  "icons/**/*",
+  "gen/**/*",
+  "capabilities/**/*",
+  "dist/**/*",
+  "../README.md",
+]
 
 [lib]
 name = "conao3_sa"

@@ -30,53 +30,59 @@ surfaces are not stable.
 cargo install conao3-sa
 ```
 
-This drops two executables into `~/.cargo/bin`:
+Two executables land in `~/.cargo/bin`:
 
 | Binary  | What it does                                                                  |
 | ------- | ----------------------------------------------------------------------------- |
 | `sa`    | Tauri desktop shell — spawns the axum backend in-process and opens a WebView. |
 | `serve` | Headless axum backend at `127.0.0.1:4000` (GraphQL + REST + SSE).             |
 
-⚠️ The published crate ships only the Rust sources; the **frontend
-SPA bundle is not yet attached to the published binary**. Without the
-bundle the WebView will fail to load the UI. Use Option B below for an
-end-to-end install. `serve` alone is useful if you only need the
-backend (e.g. to drive your own client).
+The published crate **bundles a pre-built SPA**, so `sa` works out of
+the box without a Node/pnpm toolchain on the host.
 
-### Option B — install from source (with frontend bundled)
+### Option B — install from source
 
 ```bash
 git clone https://github.com/conao3/rust-sa
 cd rust-sa
+direnv allow   # or: nix develop      # gives you rust, node, pnpm, cargo-tauri
 
-# toolchain (Nix devShell provides node, pnpm, cargo-tauri, cargo-watch).
-direnv allow   # or: nix develop
-
-# Either run `cargo tauri build` (this builds the SPA via the
-# beforeBuildCommand hook, then a release binary that includes it):
-cd src-tauri
-cargo tauri build --no-bundle      # → target/release/sa
-# (or `cargo tauri build` to also produce platform packages .deb/.AppImage/etc.)
-
-# …or `cargo install` after building the SPA yourself:
-cd ..
-make -C frontend build
+make dist                              # build the SPA into src-tauri/dist
 cargo install --path src-tauri --bin sa
 ```
+
+`make dist` runs `pnpm build` and copies `frontend/.output/public` into
+`src-tauri/dist`, which is the path Tauri reads as `frontendDist`.
+
+### Producing a platform bundle
+
+```bash
+make ship      # cargo tauri build --no-bundle      → target/release/sa
+make bundle    # cargo tauri build (full bundle)    → .deb / .AppImage / .rpm etc.
+```
+
+Bundling needs the usual platform tooling (`linuxdeploy`/`fpm` on Linux,
+Xcode on macOS, MSVC + WiX on Windows); cargo-tauri provisions most of
+it on first run.
 
 ### Launching
 
 ```bash
-# Desktop UI (Tauri WebView). The shell starts the backend on
-# 127.0.0.1:4000 in a side thread and then opens the WebView at the
-# bundled SPA.
+# Desktop UI. The shell starts the backend on 127.0.0.1:4000 in a side
+# thread, then opens the WebView pointed at the embedded SPA.
 sa
 
-# Or headless backend + browser (handy for development):
+# Or headless backend + browser (useful for development):
 serve &
 # then run the frontend dev server in another shell:
 #   make -C frontend dev   # vite via portless at https://sa.localhost
 ```
+
+> Note: `sa` starts the UI at `/`. In-app navigation uses TanStack
+> Router (client-side), so links work; a manual reload of a deep URL
+> like `/browse` may bounce back to `/` because Tauri's static asset
+> resolver does not implement a SPA fallback. Stick to in-app
+> navigation and reloads are rarely needed.
 
 The first time you launch, you'll be on `/` — point it at any local
 repo via the folder picker and you'll land in `/browse`. From there

@@ -10,6 +10,24 @@ dev-frontend:
 build:
 	$(MAKE) -C src-tauri build
 
+.PHONY: dist
+dist:
+	$(MAKE) -C frontend build
+	rm -rf src-tauri/dist
+	cp -r frontend/.output/public src-tauri/dist
+
+.PHONY: ship
+ship: dist
+	cd src-tauri && cargo tauri build --no-bundle
+
+.PHONY: bundle
+bundle: dist
+	cd src-tauri && cargo tauri build
+
+.PHONY: publish
+publish: dist
+	cd src-tauri && cargo publish --no-verify
+
 .PHONY: check
 check:
 	$(MAKE) -C src-tauri check
