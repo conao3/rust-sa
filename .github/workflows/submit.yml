@@ -1,0 +1,113 @@
+name: Submit
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version-bump:
+    name: Version Bump
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - id: bump
+        run: |
+          CURRENT_VERSION=$(cargo metadata --manifest-path src-tauri/Cargo.toml --format-version=1 --no-deps | jq -r '.packages[] | select(.name == "conao3-sa") | .version')
+          echo "Current version: $CURRENT_VERSION"
+
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+
+          case "${{ github.event.inputs.version_bump }}" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          NEW_VERSION="${major}.${minor}.${patch}"
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+      - run: |
+          sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" src-tauri/Cargo.toml
+          cargo check --manifest-path src-tauri/Cargo.toml --bin sa
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "bump version to ${{ steps.bump.outputs.new_version }}"
+          git tag "v${{ steps.bump.outputs.new_version }}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v${{ steps.bump.outputs.new_version }}"
+
+  publish-crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [version-bump]
+    permissions:
+      id-token: write
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/conao3-sa
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version-bump.outputs.new_version }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: make dist
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-publish-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-publish-
+            ${{ runner.os }}-cargo-
+      - run: cargo publish --no-verify --dry-run
+        working-directory: src-tauri
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish --no-verify
+        working-directory: src-tauri
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
