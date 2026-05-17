@@ -176,8 +176,8 @@ function ComparePage() {
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
         base={shortSha(base)}
-        head={shortSha(separator ? head : base)}
-        separator={separator ?? '··'}
+        head={separator ? shortSha(head) : undefined}
+        separator={separator ?? undefined}
         mode={mode}
         onModeChange={setMode}
         theme={theme}

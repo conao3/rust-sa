@@ -11,7 +11,7 @@ export type View = 'diff' | 'graph'
 
 export interface TopBarProps {
   base: string
-  head: string
+  head?: string
   separator?: '··' | '···'
   mode: Mode
   onModeChange: (mode: Mode) => void
@@ -234,8 +234,12 @@ export function TopBar({
 
       <div className="flex items-center gap-2 pl-4 border-l border-hairline flex-shrink-0">
         <span className="text-ink">{base}</span>
-        <span className="text-mute">{separator}</span>
-        <span className="text-ink">{head}</span>
+        {head != null && (
+          <>
+            <span className="text-mute">{separator}</span>
+            <span className="text-ink">{head}</span>
+          </>
+        )}
       </div>
 
       {isLive && (
