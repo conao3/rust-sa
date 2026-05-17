@@ -1,7 +1,7 @@
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
-import { ArrowUp, Check, File, Folder, GitBranch, Home, X } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowUp, Check, File, Folder, GitBranch, Home, Search, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Dialog, Modal, ModalOverlay, type ModalOverlayProps } from 'react-aria-components'
 import { Button } from '#/components/ui/button'
 import clsx from 'clsx'
@@ -42,12 +42,24 @@ export interface FolderPickerProps extends Omit<ModalOverlayProps, 'children'> {
 export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps) {
   const [cwd, setCwd] = useState<string | null>(initialPath ?? null)
   const [showHidden, setShowHidden] = useState(false)
+  const [query, setQuery] = useState('')
   const { data, loading, error } = useQuery<{ listDir: DirListing }>(LIST_DIR_QUERY, {
     variables: { path: cwd },
     fetchPolicy: 'network-only',
   })
   const listing = data?.listDir
-  const entries = (listing?.entries ?? []).filter((e) => showHidden || !e.isHidden)
+  const baseEntries = (listing?.entries ?? []).filter((e) => showHidden || !e.isHidden)
+  const entries = query
+    ? baseEntries
+        .map((e) => ({ entry: e, score: fuzzyScore(query, e.name) }))
+        .filter((x) => x.score > 0)
+        .toSorted((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+        .map((x) => x.entry)
+    : baseEntries
+
+  useEffect(() => {
+    setQuery('')
+  }, [cwd])
 
   const close = () => rest.onOpenChange?.(false)
 
@@ -78,12 +90,45 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
             </span>
           </div>
           <Breadcrumb path={listing?.path ?? cwd ?? ''} onNavigate={setCwd} />
+          <div className="px-5 py-2 border-b border-hairline-soft flex items-center gap-2 font-mono text-xs text-mute">
+            <Search size={16} aria-hidden="true" className="text-faint flex-shrink-0" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (entries.length > 0 && entries[0].isDir) {
+                    e.preventDefault()
+                    enter(entries[0].name)
+                  }
+                }
+              }}
+              placeholder="type to filter…"
+              autoFocus
+              className="flex-1 bg-transparent text-ink outline-none placeholder:text-faint"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                aria-label="clear filter"
+                className="text-faint hover:text-ink cursor-pointer inline-flex items-center"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            )}
+            <span className="text-faint">
+              {entries.length}
+              {query ? ` / ${baseEntries.length}` : ''}
+            </span>
+          </div>
           <div className="flex-1 overflow-y-auto">
             {loading && <div className="px-5 py-4 font-mono text-xs text-mute">loading…</div>}
             {error && (
               <div className="px-5 py-4 font-mono text-xs text-crimson">{error.message}</div>
             )}
-            {listing?.parent && (
+            {listing?.parent && !query && (
               <EntryRow
                 name=".."
                 isDir
@@ -101,6 +146,9 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
                 onActivate={() => e.isDir && enter(e.name)}
               />
             ))}
+            {!loading && !error && entries.length === 0 && (
+              <div className="px-5 py-4 font-mono text-xs text-mute">no matches</div>
+            )}
           </div>
           <div className="border-t border-hairline px-5 py-3 flex items-center gap-2">
             <span className="font-mono text-xs text-mute truncate flex-1">
@@ -129,6 +177,34 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
       </Modal>
     </ModalOverlay>
   )
+}
+
+function fuzzyScore(needle: string, haystack: string): number {
+  const n = needle.toLowerCase()
+  const h = haystack.toLowerCase()
+  let score = 0
+  let j = 0
+  let streak = 0
+  let prevIdx = -1
+  for (let i = 0; i < h.length && j < n.length; i++) {
+    if (h[i] === n[j]) {
+      score += 1
+      if (i === 0) score += 2
+      else if (h[i - 1] === '/' || h[i - 1] === '-' || h[i - 1] === '_' || h[i - 1] === '.')
+        score += 2
+      if (prevIdx === i - 1) {
+        streak += 1
+        score += streak
+      } else {
+        streak = 0
+      }
+      prevIdx = i
+      j++
+    }
+  }
+  if (j < n.length) return 0
+  if (h.startsWith(n)) score += 5
+  return score
 }
 
 function Breadcrumb({ path, onNavigate }: { path: string; onNavigate: (p: string) => void }) {
