@@ -7,9 +7,10 @@ export interface DiffState {
   error: Error | null
 }
 
-function diffUrl(rev: string, repo: string, path?: string): string {
+function diffUrl(rev: string, repo: string, path?: string, w?: boolean): string {
   const params = new URLSearchParams({ rev, repo })
   if (path) params.set('path', path)
+  if (w) params.set('w', '1')
   return `${API_ORIGIN}/api/diff?${params.toString()}`
 }
 
@@ -19,6 +20,7 @@ export function useDiff(
   refreshKey: number = 0,
   path?: string,
   initial?: string,
+  w?: boolean,
 ): DiffState {
   const [state, setState] = useState<DiffState>(() =>
     initial !== undefined
@@ -34,7 +36,7 @@ export function useDiff(
     }
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
-    fetch(diffUrl(rev, repo, path))
+    fetch(diffUrl(rev, repo, path, w))
       .then(async (r) => {
         if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
         return r.text()
@@ -54,7 +56,7 @@ export function useDiff(
     return () => {
       cancelled = true
     }
-  }, [rev, repo, refreshKey, path])
+  }, [rev, repo, refreshKey, path, w])
 
   return state
 }

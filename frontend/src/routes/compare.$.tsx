@@ -32,8 +32,8 @@ function gitStatusKey(s: string): GitStatusEntry['status'] {
 }
 
 const FILES_QUERY = gql`
-  query Files($rev: String!, $repo: String!) {
-    files(rev: $rev, repo: $repo) {
+  query Files($rev: String!, $repo: String!, $w: Boolean) {
+    files(rev: $rev, repo: $repo, w: $w) {
       path
       status
       additions
@@ -51,10 +51,12 @@ interface LoaderData {
   rev: string
   repo: string
   files: FileEntry[]
+  w: boolean
 }
 
 interface CompareSearch {
   repo?: string
+  w?: boolean
 }
 
 function parseSpec(spec: string): { base: string; head: string; separator: '··' | '···' | null } {
@@ -79,11 +81,13 @@ function specShortLabel(spec: string): string {
 export const Route = createFileRoute('/compare/$')({
   validateSearch: (search: Record<string, unknown>): CompareSearch => ({
     repo: typeof search.repo === 'string' ? search.repo : undefined,
+    w: search.w === '1' || search.w === 1 || search.w === true ? true : undefined,
   }),
-  loaderDeps: ({ search }) => ({ repo: search.repo }),
+  loaderDeps: ({ search }) => ({ repo: search.repo, w: search.w }),
   loader: async ({ params, deps }): Promise<LoaderData> => {
     const rev = params._splat ?? 'HEAD'
     const repo = deps.repo
+    const w = !!deps.w
     if (!repo) {
       throw new Error('?repo=<absolute-path> query parameter is required')
     }
@@ -93,12 +97,12 @@ export const Route = createFileRoute('/compare/$')({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query:
-          'query Files($rev: String!, $repo: String!) { files(rev: $rev, repo: $repo) { path status additions deletions } }',
-        variables: { rev, repo },
+          'query Files($rev: String!, $repo: String!, $w: Boolean) { files(rev: $rev, repo: $repo, w: $w) { path status additions deletions } }',
+        variables: { rev, repo, w },
       }),
     })
     const json = (await res.json()) as { data?: { files?: FileEntry[] } }
-    return { rev, repo, files: json.data?.files ?? [] }
+    return { rev, repo, files: json.data?.files ?? [], w }
   },
   component: ComparePage,
 })
@@ -117,7 +121,15 @@ function ComparePage() {
   useRootAttribute('data-density', density)
 
   const loaderData = Route.useLoaderData()
-  const { rev, repo, files } = loaderData
+  const { rev, repo, files, w } = loaderData
+  const setW = (next: boolean) => {
+    navigate({
+      to: '/compare/$',
+      params: { _splat: rev },
+      search: (prev) => ({ ...prev, w: next ? 1 : undefined }) as CompareSearch,
+      replace: true,
+    })
+  }
 
   const onViewChange = (next: View) => {
     if (next === 'graph') navigate({ to: '/graph', search: { repo } })
@@ -125,7 +137,7 @@ function ComparePage() {
 
   const [refreshKey, setRefreshKey] = useState(0)
   const { data, refetch } = useQuery<{ files: FileEntry[] }>(FILES_QUERY, {
-    variables: { rev, repo },
+    variables: { rev, repo, w },
     skip: refreshKey === 0,
   })
   const liveFiles = refreshKey === 0 ? files : (data?.files ?? files)
@@ -208,6 +220,8 @@ function ComparePage() {
         onClearPrompts={comments.length > 0 ? clearComments : undefined}
         clearPromptsLabel={`clear ${comments.length}`}
         isLive
+        ignoreWhitespace={w}
+        onIgnoreWhitespaceChange={setW}
       />
       <div
         className="grid min-h-0 border-t border-hairline"
@@ -222,7 +236,7 @@ function ComparePage() {
         </aside>
         <ResizeHandle
           width={treeW}
-          onWidthChange={(w) => setTreeWStr(String(Math.round(w)))}
+          onWidthChange={(next) => setTreeWStr(String(Math.round(next)))}
           min={200}
           max={600}
           ariaLabel="resize file tree"
@@ -240,6 +254,7 @@ function ComparePage() {
             onToggleViewed={toggle}
             onAddComment={(input) => addComment({ ...input, author: 'you' })}
             onDeleteComment={removeComment}
+            ignoreWhitespace={w}
           />
         </main>
       </div>

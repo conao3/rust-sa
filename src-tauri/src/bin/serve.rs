@@ -155,9 +155,10 @@ impl Query {
         &self,
         rev: Option<String>,
         repo: String,
+        w: Option<bool>,
     ) -> async_graphql::Result<Vec<FileEntry>> {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
-        let (subcmd, extra) = diff_extras_for_rev(&rev);
+        let (subcmd, extra) = diff_extras_for_rev(&rev, w.unwrap_or(false));
 
         let mut numstat_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--numstat".into()];
         numstat_args.extend(extra.clone());
@@ -356,6 +357,7 @@ struct DiffParams {
     rev: Option<String>,
     path: Option<String>,
     repo: String,
+    w: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -373,7 +375,15 @@ fn is_staging(s: &str) -> bool {
     s.eq_ignore_ascii_case("STAGING")
 }
 
-fn diff_extras_for_rev(rev: &str) -> (&'static str, Vec<String>) {
+fn diff_extras_for_rev(rev: &str, ignore_ws: bool) -> (&'static str, Vec<String>) {
+    let (subcmd, mut args) = base_diff_extras(rev);
+    if ignore_ws {
+        args.insert(0, "-w".to_string());
+    }
+    (subcmd, args)
+}
+
+fn base_diff_extras(rev: &str) -> (&'static str, Vec<String>) {
     if is_working(rev) {
         return ("diff", vec!["HEAD".into()]);
     }
@@ -433,7 +443,8 @@ fn normalize_renamed_path(raw: &str) -> String {
 
 async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
     let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
-    let (subcmd, extra) = diff_extras_for_rev(&rev);
+    let ignore_ws = matches!(params.w.as_deref(), Some("1") | Some("true"));
+    let (subcmd, extra) = diff_extras_for_rev(&rev, ignore_ws);
     let mut args: Vec<String> = vec![subcmd.into(), "--no-color".into()];
     args.extend(extra);
     if let Some(p) = params.path.as_ref() {

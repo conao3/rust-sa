@@ -44,6 +44,7 @@ export interface DiffViewProps {
   onToggleViewed?: (path: string) => void
   onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
+  ignoreWhitespace?: boolean
 }
 
 export function DiffView({
@@ -60,6 +61,7 @@ export function DiffView({
   onToggleViewed,
   onAddComment,
   onDeleteComment,
+  ignoreWhitespace,
 }: DiffViewProps) {
   return (
     <div className={className}>
@@ -80,6 +82,7 @@ export function DiffView({
           onToggleViewed={onToggleViewed ? () => onToggleViewed(f.path) : undefined}
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
+          ignoreWhitespace={ignoreWhitespace}
         />
       ))}
     </div>
@@ -101,6 +104,7 @@ interface FileBlockProps {
   onToggleViewed?: () => void
   onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
+  ignoreWhitespace?: boolean
 }
 
 interface ComposingState {
@@ -124,8 +128,16 @@ function FileBlock({
   onToggleViewed,
   onAddComment,
   onDeleteComment,
+  ignoreWhitespace,
 }: FileBlockProps) {
-  const { patch, loading, error } = useDiff(rev, repo, refreshKey, path, initialPatch)
+  const { patch, loading, error } = useDiff(
+    rev,
+    repo,
+    refreshKey,
+    path,
+    initialPatch,
+    ignoreWhitespace,
+  )
   const reservedHeight = Math.max(240, (additions + deletions + 30) * 22)
   const [composing, setComposing] = useState<ComposingState | null>(null)
   const [composerBody, setComposerBody] = useState('')

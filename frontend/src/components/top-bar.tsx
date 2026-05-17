@@ -1,10 +1,20 @@
 import { Link } from '@tanstack/react-router'
-import { Check, ClipboardCopy, Radio, Trash2, X } from 'lucide-react'
+import { Check, ClipboardCopy, Radio, Settings, Trash2, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
-import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
+import {
+  Button as AriaButton,
+  Dialog,
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuTrigger,
+  Modal,
+  ModalOverlay,
+  Popover,
+  Header as RACHeader,
+} from 'react-aria-components'
 import { Button } from '#/components/ui/button'
-import { Segmented, SegmentedItem } from '#/components/ui/segmented'
 
 export type Mode = 'unified' | 'split'
 export type Theme = 'light' | 'dark'
@@ -26,6 +36,8 @@ export interface TopBarProps {
   clearPromptsLabel?: string
   isLive?: boolean
   right?: ReactNode
+  ignoreWhitespace?: boolean
+  onIgnoreWhitespaceChange?: (next: boolean) => void
 }
 
 function ViewedProgress({ count, total }: { count: number; total: number }) {
@@ -221,6 +233,8 @@ export function TopBar({
   clearPromptsLabel = 'clear prompts',
   isLive,
   right,
+  ignoreWhitespace,
+  onIgnoreWhitespaceChange,
 }: TopBarProps) {
   return (
     <header className="flex items-center gap-4 px-4 h-[var(--topbar-h)] bg-bg font-mono text-xs text-ink-2">
@@ -255,22 +269,90 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-3">
         {right}
         <ViewTabs value={view} onChange={onViewChange} />
-        <Segmented
-          aria-label="View mode"
-          selectedKeys={[mode]}
-          onSelectionChange={(keys) => {
-            const first = [...keys][0]
-            if (first === 'unified' || first === 'split') onModeChange(first)
-          }}
-        >
-          <SegmentedItem id="unified">unified</SegmentedItem>
-          <SegmentedItem id="split">split</SegmentedItem>
-        </Segmented>
         {onCopyPrompts && <CopyPromptsButton onPress={onCopyPrompts} label={copyPromptsLabel} />}
         {onClearPrompts && (
           <ClearPromptsButton onPress={onClearPrompts} label={clearPromptsLabel} />
         )}
+        <SettingsMenu
+          mode={mode}
+          onModeChange={onModeChange}
+          ignoreWhitespace={ignoreWhitespace ?? false}
+          onIgnoreWhitespaceChange={onIgnoreWhitespaceChange}
+        />
       </div>
     </header>
+  )
+}
+
+function SettingsMenu({
+  mode,
+  onModeChange,
+  ignoreWhitespace,
+  onIgnoreWhitespaceChange,
+}: {
+  mode: Mode
+  onModeChange: (m: Mode) => void
+  ignoreWhitespace: boolean
+  onIgnoreWhitespaceChange?: (next: boolean) => void
+}) {
+  return (
+    <MenuTrigger>
+      <AriaButton
+        aria-label="View settings"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-sm text-mute hover:text-ink hover:bg-bg-card border border-hairline cursor-pointer outline-none data-[focus-visible]:ring-2 data-[focus-visible]:ring-rust"
+      >
+        <Settings size={16} aria-hidden="true" />
+      </AriaButton>
+      <Popover
+        placement="bottom end"
+        offset={6}
+        className="min-w-56 rounded-sm border border-hairline bg-bg shadow-md outline-none"
+      >
+        <Menu aria-label="View settings" className="py-1 outline-none font-mono text-xs text-ink">
+          <MenuSection>
+            <RACHeader className="px-3 pt-2 pb-1 uppercase tracking-widest text-mute text-[10px]">
+              Layout
+            </RACHeader>
+            <MenuItem
+              onAction={() => onModeChange('unified')}
+              className="flex items-center gap-2 px-3 py-1.5 cursor-pointer data-[hovered]:bg-bg-card outline-none"
+            >
+              <Check
+                size={14}
+                aria-hidden="true"
+                className={mode === 'unified' ? 'text-rust' : 'opacity-0'}
+              />
+              <span>Unified</span>
+            </MenuItem>
+            <MenuItem
+              onAction={() => onModeChange('split')}
+              className="flex items-center gap-2 px-3 py-1.5 cursor-pointer data-[hovered]:bg-bg-card outline-none"
+            >
+              <Check
+                size={14}
+                aria-hidden="true"
+                className={mode === 'split' ? 'text-rust' : 'opacity-0'}
+              />
+              <span>Split</span>
+            </MenuItem>
+          </MenuSection>
+          {onIgnoreWhitespaceChange && (
+            <MenuSection className="mt-1 border-t border-hairline-soft pt-1">
+              <MenuItem
+                onAction={() => onIgnoreWhitespaceChange(!ignoreWhitespace)}
+                className="flex items-center gap-2 px-3 py-1.5 cursor-pointer data-[hovered]:bg-bg-card outline-none"
+              >
+                <Check
+                  size={14}
+                  aria-hidden="true"
+                  className={ignoreWhitespace ? 'text-rust' : 'opacity-0'}
+                />
+                <span>Hide whitespace</span>
+              </MenuItem>
+            </MenuSection>
+          )}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   )
 }
