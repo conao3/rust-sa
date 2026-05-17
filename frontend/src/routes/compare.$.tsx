@@ -129,7 +129,12 @@ function ComparePage() {
   const paths = fileEntries.map((f) => f.path)
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
-  const { comments, add: addComment, remove: removeComment } = useComments(rev)
+  const {
+    comments,
+    add: addComment,
+    remove: removeComment,
+    clear: clearComments,
+  } = useComments(rev)
 
   const currentPath = paths[focusedIndex] ?? paths[0]
   const { base, head, separator } = parseSpec(rev)
@@ -182,7 +187,9 @@ function ComparePage() {
         viewedCount={viewedCount}
         totalCount={paths.length}
         onCopyPrompts={comments.length > 0 ? copyAllPrompts : undefined}
-        copyPromptsLabel={comments.length > 0 ? `copy ${comments.length} prompts` : 'copy prompts'}
+        copyPromptsLabel={`copy ${comments.length}`}
+        onClearPrompts={comments.length > 0 ? clearComments : undefined}
+        clearPromptsLabel={`clear ${comments.length}`}
         isLive
       />
       <div className="grid grid-cols-[var(--tree-w)_1fr] min-h-0 border-t border-hairline">

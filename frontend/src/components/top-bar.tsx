@@ -1,4 +1,4 @@
-import { Check, ClipboardCopy, Radio } from 'lucide-react'
+import { Check, ClipboardCopy, Radio, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
@@ -22,6 +22,8 @@ export interface TopBarProps {
   totalCount: number
   onCopyPrompts?: () => void
   copyPromptsLabel?: string
+  onClearPrompts?: () => void
+  clearPromptsLabel?: string
   isLive?: boolean
   right?: ReactNode
 }
@@ -84,12 +86,15 @@ function CopyPromptsButton({ onPress, label }: { onPress: () => void; label: str
         window.setTimeout(() => setCopied(false), 1500)
       }}
     >
-      <span className="relative inline-flex items-center justify-center">
-        <span aria-hidden="true" className="invisible inline-flex items-center gap-1.5">
+      <span className="relative inline-flex items-center justify-center whitespace-nowrap">
+        <span
+          aria-hidden="true"
+          className="invisible inline-flex items-center gap-1.5 whitespace-nowrap"
+        >
           <ClipboardCopy size={16} />
           {label}
         </span>
-        <span className="absolute inset-0 inline-flex items-center justify-center">
+        <span className="absolute inset-0 inline-flex items-center justify-center whitespace-nowrap">
           <AnimatePresence mode="wait" initial={false}>
             {copied ? (
               <motion.span
@@ -113,6 +118,72 @@ function CopyPromptsButton({ onPress, label }: { onPress: () => void; label: str
                 transition={{ duration: 0.12 }}
               >
                 <ClipboardCopy size={16} aria-hidden="true" />
+                {label}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </span>
+      </span>
+    </Button>
+  )
+}
+
+function ClearPromptsButton({ onPress, label }: { onPress: () => void; label: string }) {
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <Button
+      variant="secondary"
+      size="md"
+      className={confirming ? 'bg-crimson-soft border-crimson text-crimson' : undefined}
+      onPress={() => {
+        if (confirming) {
+          onPress()
+          setConfirming(false)
+        } else {
+          setConfirming(true)
+          window.setTimeout(() => setConfirming(false), 3000)
+        }
+      }}
+    >
+      <span className="relative inline-grid items-center justify-center whitespace-nowrap">
+        <span
+          aria-hidden="true"
+          className="invisible inline-flex items-center gap-1.5 row-start-1 col-start-1"
+        >
+          <Trash2 size={16} />
+          {label}
+        </span>
+        <span
+          aria-hidden="true"
+          className="invisible inline-flex items-center gap-1.5 row-start-1 col-start-1"
+        >
+          <Trash2 size={16} />
+          really clear?
+        </span>
+        <span className="absolute inset-0 inline-flex items-center justify-center whitespace-nowrap">
+          <AnimatePresence mode="wait" initial={false}>
+            {confirming ? (
+              <motion.span
+                key="confirm"
+                className="inline-flex items-center gap-1.5"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                really clear?
+              </motion.span>
+            ) : (
+              <motion.span
+                key="clear"
+                className="inline-flex items-center gap-1.5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+              >
+                <Trash2 size={16} aria-hidden="true" />
                 {label}
               </motion.span>
             )}
@@ -147,6 +218,8 @@ export function TopBar({
   totalCount,
   onCopyPrompts,
   copyPromptsLabel = 'copy prompts',
+  onClearPrompts,
+  clearPromptsLabel = 'clear prompts',
   isLive,
   right,
 }: TopBarProps) {
@@ -198,6 +271,9 @@ export function TopBar({
           <SegmentedItem id="dark">dark</SegmentedItem>
         </Segmented>
         {onCopyPrompts && <CopyPromptsButton onPress={onCopyPrompts} label={copyPromptsLabel} />}
+        {onClearPrompts && (
+          <ClearPromptsButton onPress={onClearPrompts} label={clearPromptsLabel} />
+        )}
       </div>
     </header>
   )

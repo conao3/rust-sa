@@ -17,6 +17,7 @@ export interface CommentsState {
   comments: Comment[]
   add: (input: Omit<Comment, 'id' | 'createdAt'>) => Comment
   remove: (id: string) => void
+  clear: () => void
 }
 
 interface StoredCommentV1 extends Omit<Comment, 'startLineNumber' | 'endLineNumber'> {
@@ -71,5 +72,6 @@ export function useComments(rev: string): CommentsState {
       return next
     },
     remove: (id) => setComments((prev) => prev.filter((c) => c.id !== id)),
+    clear: () => setComments([]),
   }
 }
