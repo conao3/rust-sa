@@ -194,6 +194,10 @@ function GraphPage() {
     else setBase(name)
   }
 
+  const openSpecDiff = (spec: string) => {
+    navigate({ to: '/compare/$', params: { _splat: spec }, search: { repo } })
+  }
+
   const baseIsSpecial = isSpecial(base)
   const headIsSpecial = isSpecial(head)
   const anySpecial = baseIsSpecial || headIsSpecial
@@ -248,7 +252,12 @@ function GraphPage() {
             <div className="px-4 py-2 font-mono text-xs text-mute">loading…</div>
           )}
           {error && <div className="px-4 py-2 font-mono text-xs text-crimson">{error.message}</div>}
-          <SpecialRows base={base} head={head} onSelect={onSpecialClick} />
+          <SpecialRows
+            base={base}
+            head={head}
+            onSelect={onSpecialClick}
+            onDoubleSelect={openSpecDiff}
+          />
           <RefSection
             title="branches"
             icon={GitBranch}
@@ -256,6 +265,7 @@ function GraphPage() {
             base={base}
             head={head}
             onClick={onRefClick}
+            onDoubleClick={openSpecDiff}
             storageKey="rust-sa:graph-branches-open"
           />
           <RefSection
@@ -265,9 +275,16 @@ function GraphPage() {
             base={base}
             head={head}
             onClick={onRefClick}
+            onDoubleClick={openSpecDiff}
             storageKey="rust-sa:graph-tags-open"
           />
-          <CommitList commits={commits} base={base} head={head} onRowClick={onRowClick} />
+          <CommitList
+            commits={commits}
+            base={base}
+            head={head}
+            onRowClick={onRowClick}
+            onRowDoubleClick={openSpecDiff}
+          />
           <LoadMoreSentinel
             onVisible={loadMore}
             disabled={loadingMore || exhausted || commits.length === 0}
@@ -445,10 +462,12 @@ function SpecialRows({
   base,
   head,
   onSelect,
+  onDoubleSelect,
 }: {
   base: string | null
   head: string | null
   onSelect: (e: MouseEvent, id: 'WORKING' | 'STAGING') => void
+  onDoubleSelect: (id: 'WORKING' | 'STAGING') => void
 }) {
   return (
     <div className="border-b border-hairline bg-amber-soft">
@@ -460,6 +479,7 @@ function SpecialRows({
             key={id}
             type="button"
             onClick={(e) => onSelect(e, id)}
+            onDoubleClick={() => onDoubleSelect(id)}
             style={{ height: ROW_HEIGHT }}
             className={clsx(
               'w-full text-left flex items-center gap-2 pr-3 pl-3 font-mono text-xs cursor-pointer border-l-2',
@@ -509,6 +529,7 @@ function RefSection({
   base,
   head,
   onClick,
+  onDoubleClick,
   storageKey,
 }: {
   title: string
@@ -517,6 +538,7 @@ function RefSection({
   base: string | null
   head: string | null
   onClick: (e: MouseEvent, name: string) => void
+  onDoubleClick: (name: string) => void
   storageKey: string
 }) {
   const [openStr, setOpenStr] = usePreference<string>(storageKey, 'false')
@@ -597,6 +619,7 @@ function RefSection({
                 key={r.name}
                 type="button"
                 onClick={(e) => onClick(e, r.name)}
+                onDoubleClick={() => onDoubleClick(r.name)}
                 style={{ height: ROW_HEIGHT }}
                 className={clsx(
                   'w-full text-left flex items-center gap-2 px-3 font-mono text-xs cursor-pointer border-l-2',
@@ -703,11 +726,13 @@ function CommitList({
   base,
   head,
   onRowClick,
+  onRowDoubleClick,
 }: {
   commits: Commit[]
   base: string | null
   head: string | null
   onRowClick: (e: MouseEvent, sha: string) => void
+  onRowDoubleClick: (sha: string) => void
 }) {
   const nodes = layoutGraph(commits)
   const totalLanes = nodes.reduce(
@@ -727,6 +752,7 @@ function CommitList({
           isBase={base === c.sha}
           isHead={head === c.sha}
           onClick={(e) => onRowClick(e, c.sha)}
+          onDoubleClick={() => onRowDoubleClick(c.sha)}
         />
       ))}
     </>
@@ -741,6 +767,7 @@ function CommitRow({
   isBase,
   isHead,
   onClick,
+  onDoubleClick,
 }: {
   commit: Commit
   node: GraphNode
@@ -749,11 +776,13 @@ function CommitRow({
   isBase: boolean
   isHead: boolean
   onClick: (e: MouseEvent) => void
+  onDoubleClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       style={{ height: ROW_HEIGHT }}
       className={clsx(
         'w-full text-left flex items-center gap-2 pr-3 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
