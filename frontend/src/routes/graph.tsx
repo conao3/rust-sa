@@ -9,6 +9,8 @@ import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
 import { Tag } from '#/components/ui/tag'
 import clsx from 'clsx'
+import { GraphColumn } from '#/components/graph-column'
+import { layoutGraph, type GraphNode } from '#/lib/git-graph'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { shortSha } from '#/lib/short-sha'
 
@@ -37,6 +39,7 @@ interface Commit {
   author: string
   when: string
   refs: string
+  parents: string[]
 }
 
 const COMMITS_QUERY = gql`
@@ -48,6 +51,7 @@ const COMMITS_QUERY = gql`
       author
       when
       refs
+      parents
     }
   }
 `
@@ -118,15 +122,7 @@ function GraphPage() {
           </div>
           {loading && <div className="px-4 py-2 font-mono text-xs text-mute">loading…</div>}
           {error && <div className="px-4 py-2 font-mono text-xs text-crimson">{error.message}</div>}
-          {commits.map((c) => (
-            <CommitRow
-              key={c.sha}
-              commit={c}
-              isBase={base === c.sha}
-              isHead={head === c.sha}
-              onClick={(e) => onRowClick(e, c.sha)}
-            />
-          ))}
+          <CommitList commits={commits} base={base} head={head} onRowClick={onRowClick} />
         </aside>
         <main className="relative overflow-hidden bg-bg">
           <div className="absolute inset-0 flex items-center justify-center font-serif text-4xl tracking-tight text-faint">
@@ -150,13 +146,56 @@ function GraphPage() {
   )
 }
 
+const ROW_HEIGHT = 28
+
+function CommitList({
+  commits,
+  base,
+  head,
+  onRowClick,
+}: {
+  commits: Commit[]
+  base: string | null
+  head: string | null
+  onRowClick: (e: MouseEvent, sha: string) => void
+}) {
+  const nodes = layoutGraph(commits)
+  const totalLanes = nodes.reduce(
+    (max, n) =>
+      Math.max(max, n.lane + 1, ...n.parentLanes.map((p) => p + 1), ...n.passing.map((p) => p + 1)),
+    1,
+  )
+  return (
+    <>
+      {commits.map((c, i) => (
+        <CommitRow
+          key={c.sha}
+          commit={c}
+          node={nodes[i]}
+          nextNode={nodes[i + 1]}
+          totalLanes={totalLanes}
+          isBase={base === c.sha}
+          isHead={head === c.sha}
+          onClick={(e) => onRowClick(e, c.sha)}
+        />
+      ))}
+    </>
+  )
+}
+
 function CommitRow({
   commit,
+  node,
+  nextNode,
+  totalLanes,
   isBase,
   isHead,
   onClick,
 }: {
   commit: Commit
+  node: GraphNode
+  nextNode: GraphNode | undefined
+  totalLanes: number
   isBase: boolean
   isHead: boolean
   onClick: (e: MouseEvent) => void
@@ -165,12 +204,14 @@ function CommitRow({
     <button
       type="button"
       onClick={onClick}
+      style={{ height: ROW_HEIGHT }}
       className={clsx(
-        'w-full text-left flex items-center gap-2.5 px-3 py-2 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
+        'w-full text-left flex items-center gap-2 pr-3 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
         isBase && 'bg-rust-soft',
         isHead && 'bg-moss-soft',
       )}
     >
+      <GraphColumn node={node} nextNode={nextNode} rowHeight={ROW_HEIGHT} totalLanes={totalLanes} />
       <span className="text-rust">{commit.short}</span>
       <span className="text-ink flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
         {commit.message}

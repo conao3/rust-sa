@@ -30,6 +30,7 @@ struct Commit {
     author: String,
     when: String,
     refs: String,
+    parents: Vec<String>,
 }
 
 #[derive(SimpleObject)]
@@ -203,7 +204,7 @@ impl Query {
                 "log",
                 &format!("-n{limit}"),
                 "--decorate=short",
-                "--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ar%x1f%D",
+                "--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ar%x1f%D%x1f%P",
             ])
             .output()
             .await
@@ -217,9 +218,13 @@ impl Query {
             .lines()
             .filter_map(|line| {
                 let parts: Vec<&str> = line.split('\x1f').collect();
-                if parts.len() < 6 {
+                if parts.len() < 7 {
                     return None;
                 }
+                let parents = parts[6]
+                    .split_whitespace()
+                    .map(String::from)
+                    .collect::<Vec<_>>();
                 Some(Commit {
                     sha: parts[0].to_string(),
                     short: parts[1].to_string(),
@@ -227,6 +232,7 @@ impl Query {
                     author: parts[3].to_string(),
                     when: parts[4].to_string(),
                     refs: parts[5].to_string(),
+                    parents,
                 })
             })
             .collect();
