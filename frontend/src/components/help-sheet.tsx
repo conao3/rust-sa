@@ -36,7 +36,7 @@ const GROUPS = [
     label: 'Graph picker',
     items: [
       { keys: ['click'], action: 'Set base (older / starting commit)' },
-      { keys: ['⇧+click'], action: 'Set head (newer / target commit)' },
+      { keys: ['⌃+click'], action: 'Set head (newer / target commit)' },
     ],
   },
 ] as const

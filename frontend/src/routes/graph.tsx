@@ -103,7 +103,7 @@ function GraphPage() {
   )
 
   const onRowClick = (e: MouseEvent, sha: string) => {
-    if (e.shiftKey) setHead(sha)
+    if (e.ctrlKey || e.metaKey) setHead(sha)
     else setBase(sha)
   }
 
@@ -155,8 +155,8 @@ function GraphPage() {
                 </h2>
                 <p className="m-0 font-sans text-sm text-mute max-w-md">
                   Click to set <span className="text-rust font-medium">base</span> (older)
-                  {' · '}
-                  Shift-click to set <span className="text-moss font-medium">head</span> (newer).
+                  {' · '}⌃ / ⌘ + click to set <span className="text-moss font-medium">head</span>{' '}
+                  (newer).
                 </p>
                 <p className="m-0 font-sans text-xs text-faint max-w-md">
                   Selecting only base shows that commit&apos;s diff against its parent. Selecting
@@ -348,12 +348,12 @@ function GraphSummary({
       <span className="text-xs uppercase tracking-wider text-mute">compare</span>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-rust" />
-        {base ? shortSha(base) : '—'}
+        {base ? shortSha(base) : <span className="text-faint font-normal">click</span>}
       </span>
       <span className="text-faint">{threeDot ? '···' : '··'}</span>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-moss" />
-        {head ? shortSha(head) : '—'}
+        {head ? shortSha(head) : <span className="text-faint font-normal">⌃ / ⌘ + click</span>}
       </span>
       <Button variant="ghost" size="sm" onPress={onToggleThreeDot}>
         <Split size={16} aria-hidden="true" />
