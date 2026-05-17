@@ -187,18 +187,24 @@ function HomePage() {
 
         <section className="flex flex-col gap-4">
           <div className="font-mono text-xs uppercase tracking-widest text-mute">features</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FeatureCard
+              icon={<Eye size={16} aria-hidden="true" />}
+              title="Repo Browser"
+              path="/browse?repo=&lt;abs&gt;"
+              body="Walk the working tree, click a file to read its content at HEAD with shiki-powered syntax highlighting. Blob fetches are cached so revisits are instant."
+            />
+            <FeatureCard
+              icon={<GitGraph size={16} aria-hidden="true" />}
+              title="Commit Graph"
+              path="/graph?repo=&lt;abs&gt;"
+              body="Commit log with sticky header & infinite scroll. Click / Ctrl-click / drag rows to pick base..head. WORKING / STAGING pseudos plus branches & tags as collapsible sections."
+            />
             <FeatureCard
               icon={<FileDiff size={16} aria-hidden="true" />}
               title="Diff Reviewer"
               path="/compare/$spec?repo=&lt;abs&gt;"
-              body="File tree, multi-file unified or split diff, file-level viewed state, inline comments with Copy Prompt, vim-flavoured keybindings."
-            />
-            <FeatureCard
-              icon={<GitGraph size={16} aria-hidden="true" />}
-              title="Compare Picker"
-              path="/graph?repo=&lt;abs&gt;"
-              body="Commit log with click-to-set-base / shift-click-to-set-head, three/two-dot toggle, open the range as /compare."
+              body="File tree, unified or split diff, file-level viewed state, inline comments with Copy Prompt, optional whitespace-ignore (?w=1), vim-flavoured keybindings."
             />
             <FeatureCard
               icon={<Palette size={16} aria-hidden="true" />}
