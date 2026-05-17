@@ -70,8 +70,9 @@ function parseSpec(spec: string): { base: string; head: string; separator: '··
 }
 
 function specShortLabel(spec: string): string {
-  if (spec === 'WORKING') return 'working'
-  if (spec === 'STAGING') return 'staging'
+  const u = spec.toUpperCase()
+  if (u === 'WORKING') return 'working'
+  if (u === 'STAGING') return 'staging'
   return shortSha(spec)
 }
 

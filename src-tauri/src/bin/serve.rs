@@ -308,11 +308,19 @@ struct BlobParams {
     repo: String,
 }
 
+fn is_working(s: &str) -> bool {
+    s.eq_ignore_ascii_case("WORKING")
+}
+
+fn is_staging(s: &str) -> bool {
+    s.eq_ignore_ascii_case("STAGING")
+}
+
 fn diff_extras_for_rev(rev: &str) -> (&'static str, Vec<String>) {
-    if rev == "WORKING" {
+    if is_working(rev) {
         return ("diff", vec!["HEAD".into()]);
     }
-    if rev == "STAGING" {
+    if is_staging(rev) {
         return ("diff", vec!["--cached".into(), "HEAD".into()]);
     }
     let parts = if let Some(idx) = rev.find("...") {
@@ -321,15 +329,14 @@ fn diff_extras_for_rev(rev: &str) -> (&'static str, Vec<String>) {
         rev.find("..").map(|idx| (&rev[..idx], &rev[idx + 2..]))
     };
     if let Some((base, head)) = parts {
-        let base_special = base == "WORKING" || base == "STAGING";
-        let head_special = head == "WORKING" || head == "STAGING";
+        let base_special = is_working(base) || is_staging(base);
+        let head_special = is_working(head) || is_staging(head);
         if base_special || head_special {
-            if (base == "STAGING" && head == "WORKING") || (base == "WORKING" && head == "STAGING")
-            {
+            if (is_staging(base) && is_working(head)) || (is_working(base) && is_staging(head)) {
                 return ("diff", vec![]);
             }
             let commit = if base_special { head } else { base };
-            let cached = base == "STAGING" || head == "STAGING";
+            let cached = is_staging(base) || is_staging(head);
             return if cached {
                 ("diff", vec!["--cached".into(), commit.into()])
             } else {

@@ -350,12 +350,15 @@ function DiffPreview({
 }
 
 function isSpecial(v: string | null): boolean {
-  return v === 'WORKING' || v === 'STAGING'
+  if (!v) return false
+  const u = v.toUpperCase()
+  return u === 'WORKING' || u === 'STAGING'
 }
 
 function specialLabel(id: string): string | null {
-  if (id === 'WORKING') return 'working'
-  if (id === 'STAGING') return 'staging'
+  const u = id.toUpperCase()
+  if (u === 'WORKING') return 'working'
+  if (u === 'STAGING') return 'staging'
   return null
 }
 
