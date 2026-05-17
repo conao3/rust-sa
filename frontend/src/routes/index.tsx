@@ -167,18 +167,18 @@ function HomePage() {
                   >
                     <Eye size={14} aria-hidden="true" className="text-mute flex-shrink-0" />
                     <span className="text-ink-2 truncate">{r.repo}</span>
-                    <span className="ml-auto text-mute text-xs flex-shrink-0">
-                      {timeAgo(r.visitedAt)}
-                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecents(removeRecent(r.repo))}
                     aria-label={`Remove ${r.repo} from recents`}
-                    className="px-3 py-2 text-faint hover:text-crimson cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="p-1 text-faint hover:text-crimson cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   >
                     <Trash2 size={14} aria-hidden="true" />
                   </button>
+                  <span className="pl-2 pr-3 py-2 text-mute text-xs flex-shrink-0">
+                    {timeAgo(r.visitedAt)}
+                  </span>
                 </li>
               ))}
             </ul>
