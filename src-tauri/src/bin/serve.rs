@@ -540,7 +540,7 @@ fn spawn_watcher(
 ) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     let watcher_tx = tx.clone();
     let watch_root = root.clone();
-    let mut debouncer = new_debouncer(Duration::from_millis(250), move |res: DebounceEventResult| {
+    let mut debouncer = new_debouncer(Duration::from_secs(2), move |res: DebounceEventResult| {
         if let Ok(events) = res {
             let paths: Vec<PathBuf> = events.iter().map(|e| e.path.clone()).collect();
             if any_unignored(&watch_root, &paths) {
