@@ -27,6 +27,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "graphql": "^16.14.0",
     "lucide-react": "^1.16.0",
+    "motion": "^12.38.0",
     "nitro": "npm:nitro-nightly@3.0.1-20260512-093145-0498ce70",
     "react": "^19.2.6",
     "react-aria-components": "^1.17.0",
