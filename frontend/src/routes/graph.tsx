@@ -148,8 +148,22 @@ function GraphPage() {
           {previewSpec ? (
             <DiffPreview rev={previewSpec} repo={repo} layout={mode} theme={theme} />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center font-serif text-4xl tracking-tight text-faint">
-              pick a commit.
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4 text-center px-6">
+                <h2 className="m-0 font-serif text-4xl tracking-tight text-faint">
+                  pick a commit.
+                </h2>
+                <p className="m-0 font-sans text-sm text-mute max-w-md">
+                  Click to set <span className="text-rust font-medium">base</span> (older)
+                  {' · '}
+                  Shift-click to set <span className="text-moss font-medium">head</span> (newer).
+                </p>
+                <p className="m-0 font-sans text-xs text-faint max-w-md">
+                  Selecting only base shows that commit&apos;s diff against its parent. Selecting
+                  both shows base
+                  {threeDot ? '…head' : '..head'}.
+                </p>
+              </div>
             </div>
           )}
           <GraphSummary
