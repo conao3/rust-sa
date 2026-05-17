@@ -15,6 +15,7 @@ import { FileTreeView } from '#/components/file-tree-view'
 import { GraphColumn } from '#/components/graph-column'
 import { layoutGraph, type GraphNode } from '#/lib/git-graph'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { useThemePreference } from '#/lib/server-preference'
 import { shortSha } from '#/lib/short-sha'
 
 function gitStatusKey(s: string): GitStatusEntry['status'] {
@@ -85,7 +86,7 @@ const PREVIEW_FILES_QUERY = gql`
 function GraphPage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
-  const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
+  const [theme] = useThemePreference()
   const [density] = usePreference<'compact' | 'regular' | 'comfy'>('rust-sa:density', 'regular')
   const [helpOpen, setHelpOpen] = useState(false)
   const [base, setBase] = useState<string | null>(null)
@@ -134,8 +135,6 @@ function GraphPage() {
         separator={threeDot ? '···' : '··'}
         mode={mode}
         onModeChange={setMode}
-        theme={theme}
-        onThemeChange={setTheme}
         view="graph"
         onViewChange={onViewChange}
         viewedCount={0}

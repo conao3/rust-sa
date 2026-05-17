@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PreferenceRouteImport } from './routes/preference'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as GraphRouteImport } from './routes/graph'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CompareSplatRouteImport } from './routes/compare.$'
 
+const PreferenceRoute = PreferenceRouteImport.update({
+  id: '/preference',
+  path: '/preference',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
+  '/preference': typeof PreferenceRoute
   '/compare/$': typeof CompareSplatRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
+  '/preference': typeof PreferenceRoute
   '/compare/$': typeof CompareSplatRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,28 @@ export interface FileRoutesById {
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
+  '/preference': typeof PreferenceRoute
   '/compare/$': typeof CompareSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design' | '/graph' | '/health' | '/compare/$'
+  fullPaths:
+    | '/'
+    | '/design'
+    | '/graph'
+    | '/health'
+    | '/preference'
+    | '/compare/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design' | '/graph' | '/health' | '/compare/$'
-  id: '__root__' | '/' | '/design' | '/graph' | '/health' | '/compare/$'
+  to: '/' | '/design' | '/graph' | '/health' | '/preference' | '/compare/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/design'
+    | '/graph'
+    | '/health'
+    | '/preference'
+    | '/compare/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,11 +98,19 @@ export interface RootRouteChildren {
   DesignRoute: typeof DesignRoute
   GraphRoute: typeof GraphRoute
   HealthRoute: typeof HealthRoute
+  PreferenceRoute: typeof PreferenceRoute
   CompareSplatRoute: typeof CompareSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/preference': {
+      id: '/preference'
+      path: '/preference'
+      fullPath: '/preference'
+      preLoaderRoute: typeof PreferenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health': {
       id: '/health'
       path: '/health'
@@ -124,6 +154,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesignRoute: DesignRoute,
   GraphRoute: GraphRoute,
   HealthRoute: HealthRoute,
+  PreferenceRoute: PreferenceRoute,
   CompareSplatRoute: CompareSplatRoute,
 }
 export const routeTree = rootRouteImport

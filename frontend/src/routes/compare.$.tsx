@@ -6,12 +6,13 @@ import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
-import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
+import { TopBar, type Mode, type View } from '#/components/top-bar'
 import { API_ORIGIN } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { shortSha } from '#/lib/short-sha'
 import { useComments } from '#/lib/comments'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { useThemePreference } from '#/lib/server-preference'
 import { useSSE } from '#/lib/sse'
 import { useViewed } from '#/lib/viewed'
 
@@ -97,7 +98,7 @@ export const Route = createFileRoute('/compare/$')({
 function ComparePage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
-  const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
+  const [theme] = useThemePreference()
   const [density, setDensity] = usePreference<Density>('rust-sa:density', 'regular')
   const [helpOpen, setHelpOpen] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -180,8 +181,6 @@ function ComparePage() {
         separator={separator ?? undefined}
         mode={mode}
         onModeChange={setMode}
-        theme={theme}
-        onThemeChange={setTheme}
         view="diff"
         onViewChange={onViewChange}
         viewedCount={viewedCount}

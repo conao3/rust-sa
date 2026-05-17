@@ -1,11 +1,12 @@
 import { useForm } from '@tanstack/react-form'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ExternalLink, FileDiff, Folder, GitFork, GitGraph, Palette } from 'lucide-react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { ExternalLink, FileDiff, Folder, GitFork, GitGraph, Palette, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FolderPicker } from '#/components/folder-picker'
 import { Button } from '#/components/ui/button'
 import { Kbd } from '#/components/ui/kbd'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { useThemePreference } from '#/lib/server-preference'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -38,7 +39,7 @@ function pushRecent(entry: RecentEntry): RecentEntry[] {
 
 function HomePage() {
   const navigate = useNavigate()
-  const [theme] = usePreference<'light' | 'dark'>('rust-sa:theme', 'light')
+  const [theme] = useThemePreference()
   const [density] = usePreference<'compact' | 'regular' | 'comfy'>('rust-sa:density', 'regular')
   useRootAttribute('data-theme', theme)
   useRootAttribute('data-density', density)
@@ -76,6 +77,13 @@ function HomePage() {
           <BrandMark />
           <span className="font-mono text-sm font-medium text-ink">rust-sa</span>
           <span className="ml-2 font-mono text-xs text-mute">local git diff reviewer</span>
+          <Link
+            to="/preference"
+            className="ml-auto inline-flex items-center gap-1.5 font-mono text-xs text-mute hover:text-ink"
+          >
+            <Settings size={16} aria-hidden="true" />
+            preferences
+          </Link>
         </div>
       </header>
 

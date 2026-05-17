@@ -1,4 +1,4 @@
-use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
+use async_graphql::{EmptySubscription, Object, Schema, SimpleObject};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Query as AxumQuery,
@@ -56,12 +56,52 @@ struct DirListing {
     entries: Vec<DirEntry>,
 }
 
+#[derive(SimpleObject, serde::Serialize, serde::Deserialize, Default, Clone)]
+#[serde(default)]
+struct Preferences {
+    theme: String,
+}
+
+fn config_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("sa")
+        .join("config.toml")
+}
+
+fn load_preferences() -> Preferences {
+    let path = config_path();
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return Preferences { theme: "light".into() },
+    };
+    let mut prefs: Preferences = toml::from_str(&raw).unwrap_or_default();
+    if prefs.theme.is_empty() {
+        prefs.theme = "light".into();
+    }
+    prefs
+}
+
+fn save_preferences(prefs: &Preferences) -> std::io::Result<()> {
+    let path = config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let body = toml::to_string_pretty(prefs)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    std::fs::write(path, body)
+}
+
 struct Query;
 
 #[Object]
 impl Query {
     async fn health(&self) -> String {
         "ok".to_string()
+    }
+
+    async fn preferences(&self) -> Preferences {
+        load_preferences()
     }
 
     async fn list_dir(&self, path: Option<String>) -> async_graphql::Result<DirListing> {
@@ -240,7 +280,25 @@ impl Query {
     }
 }
 
-type AppSchema = Schema<Query, EmptyMutation, EmptySubscription>;
+struct Mutation;
+
+#[Object]
+impl Mutation {
+    async fn set_preferences(&self, theme: Option<String>) -> async_graphql::Result<Preferences> {
+        let mut prefs = load_preferences();
+        if let Some(t) = theme {
+            if t != "light" && t != "dark" {
+                return Err(async_graphql::Error::new(format!("invalid theme: {t}")));
+            }
+            prefs.theme = t;
+        }
+        save_preferences(&prefs)
+            .map_err(|e| async_graphql::Error::new(format!("save preferences: {e}")))?;
+        Ok(prefs)
+    }
+}
+
+type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
 async fn graphql_handler(schema: Extension<AppSchema>, req: GraphQLRequest) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
@@ -439,7 +497,7 @@ fn spawn_watcher(
 
 #[tokio::main]
 async fn main() {
-    let schema = Schema::build(Query, EmptyMutation, EmptySubscription).finish();
+    let schema = Schema::build(Query, Mutation, EmptySubscription).finish();
     let app = build_router(schema);
     let addr: SocketAddr = "127.0.0.1:4000".parse().unwrap();
     let listener = TcpListener::bind(addr).await.unwrap();

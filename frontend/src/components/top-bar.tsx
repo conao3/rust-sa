@@ -16,8 +16,6 @@ export interface TopBarProps {
   separator?: '··' | '···'
   mode: Mode
   onModeChange: (mode: Mode) => void
-  theme: Theme
-  onThemeChange: (theme: Theme) => void
   view: View
   onViewChange: (view: View) => void
   viewedCount: number
@@ -213,8 +211,6 @@ export function TopBar({
   separator = '···',
   mode,
   onModeChange,
-  theme,
-  onThemeChange,
   view,
   onViewChange,
   viewedCount,
@@ -269,17 +265,6 @@ export function TopBar({
         >
           <SegmentedItem id="unified">unified</SegmentedItem>
           <SegmentedItem id="split">split</SegmentedItem>
-        </Segmented>
-        <Segmented
-          aria-label="Theme"
-          selectedKeys={[theme]}
-          onSelectionChange={(keys) => {
-            const first = [...keys][0]
-            if (first === 'light' || first === 'dark') onThemeChange(first)
-          }}
-        >
-          <SegmentedItem id="light">light</SegmentedItem>
-          <SegmentedItem id="dark">dark</SegmentedItem>
         </Segmented>
         {onCopyPrompts && <CopyPromptsButton onPress={onCopyPrompts} label={copyPromptsLabel} />}
         {onClearPrompts && (
