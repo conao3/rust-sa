@@ -139,6 +139,24 @@ function FileBlock({
   }
 
   useEffect(() => {
+    if (loading || error || collapsed) return
+    const container = containerRef.current?.querySelector('diffs-container')
+    const root = container?.shadowRoot
+    if (!root) return
+    if (root.getElementById('rust-sa-scrollbar-style')) return
+    const style = document.createElement('style')
+    style.id = 'rust-sa-scrollbar-style'
+    style.textContent = `
+      *{scrollbar-width:thin;scrollbar-color:var(--hairline) transparent;}
+      *::-webkit-scrollbar{width:8px;height:8px;}
+      *::-webkit-scrollbar-track{background:transparent;}
+      *::-webkit-scrollbar-thumb{background-color:var(--hairline);border-radius:9999px;}
+      *::-webkit-scrollbar-thumb:hover{background-color:var(--faint);}
+    `
+    root.appendChild(style)
+  }, [loading, error, collapsed, patch])
+
+  useEffect(() => {
     const onDocPointerDown = (e: PointerEvent) => {
       const eventPath = e.composedPath() as Element[]
       const insideContainer =
