@@ -24,4 +24,5 @@ tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }
 gix = { version = "0.74", default-features = false, features = ["max-performance-safe"] }
 notify = "8"
 notify-debouncer-mini = "0.6"
+ignore = "0.4"
 futures = "0.3"

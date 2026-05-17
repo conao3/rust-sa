@@ -8,15 +8,15 @@ use axum::{
     Extension, Router,
 };
 use futures::stream::Stream;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use ignore::Match;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
     convert::Infallible,
-    io::Write,
     net::SocketAddr,
     path::{Path, PathBuf},
-    process::Stdio,
     sync::{Mutex, OnceLock},
     time::Duration,
 };
@@ -489,59 +489,94 @@ fn build_router(schema: AppSchema) -> Router {
         )
 }
 
-fn unignored_paths(repo_root: &Path, paths: &[PathBuf]) -> Vec<PathBuf> {
-    let candidates: Vec<&PathBuf> = paths
+struct RepoIgnore {
+    repo: PathBuf,
+    /// Sorted from shallowest to deepest, so deeper rules override shallower ones.
+    rules: Vec<(PathBuf, Gitignore)>,
+    global: Gitignore,
+}
+
+impl RepoIgnore {
+    fn load(repo: &Path) -> Self {
+        let mut rules: Vec<(PathBuf, Gitignore)> = Vec::new();
+
+        let mut root_b = GitignoreBuilder::new(repo);
+        let _ = root_b.add(repo.join(".gitignore"));
+        let _ = root_b.add(repo.join(".git/info/exclude"));
+        if let Ok(gi) = root_b.build() {
+            rules.push((repo.to_owned(), gi));
+        }
+
+        for entry in ignore::WalkBuilder::new(repo)
+            .standard_filters(true)
+            .hidden(false)
+            .build()
+            .flatten()
+        {
+            if entry.file_name() != ".gitignore" {
+                continue;
+            }
+            let path = entry.path();
+            let dir = match path.parent() {
+                Some(d) => d.to_owned(),
+                None => continue,
+            };
+            if dir == *repo {
+                continue;
+            }
+            let mut b = GitignoreBuilder::new(&dir);
+            let _ = b.add(path);
+            if let Ok(gi) = b.build() {
+                rules.push((dir, gi));
+            }
+        }
+        rules.sort_by_key(|(d, _)| d.components().count());
+
+        let (global, _) = Gitignore::global();
+
+        Self {
+            repo: repo.to_owned(),
+            rules,
+            global,
+        }
+    }
+
+    fn is_ignored(&self, path: &Path, is_dir: bool) -> bool {
+        let mut last: Match<&ignore::gitignore::Glob> = Match::None;
+        for (dir, gi) in &self.rules {
+            if path.starts_with(dir) {
+                let m = gi.matched_path_or_any_parents(path, is_dir);
+                if !m.is_none() {
+                    last = m;
+                }
+            }
+        }
+        if !last.is_none() {
+            return last.is_ignore();
+        }
+        if let Ok(rel) = path.strip_prefix(&self.repo) {
+            self.global
+                .matched_path_or_any_parents(rel, is_dir)
+                .is_ignore()
+        } else {
+            false
+        }
+    }
+}
+
+fn unignored_paths(ig: &RepoIgnore, paths: &[PathBuf]) -> Vec<PathBuf> {
+    paths
         .iter()
         .filter(|p| {
             let s = p.to_string_lossy();
             if s.contains("/.git/") || s.ends_with("/.git") {
                 return false;
             }
-            !p.is_dir()
+            if p.is_dir() {
+                return false;
+            }
+            !ig.is_ignored(p, false)
         })
-        .collect();
-    if candidates.is_empty() {
-        return vec![];
-    }
-
-    let mut child = match std::process::Command::new("git")
-        .current_dir(repo_root)
-        .args(["check-ignore", "-z", "--no-index", "--stdin"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(c) => c,
-        Err(_) => return candidates.iter().map(|p| (*p).clone()).collect(),
-    };
-    {
-        let stdin = match child.stdin.as_mut() {
-            Some(s) => s,
-            None => return candidates.iter().map(|p| (*p).clone()).collect(),
-        };
-        let mut buf = Vec::new();
-        for p in &candidates {
-            buf.extend_from_slice(p.to_string_lossy().as_bytes());
-            buf.push(0);
-        }
-        if stdin.write_all(&buf).is_err() {
-            return candidates.iter().map(|p| (*p).clone()).collect();
-        }
-    }
-    let output = match child.wait_with_output() {
-        Ok(o) => o,
-        Err(_) => return candidates.iter().map(|p| (*p).clone()).collect(),
-    };
-    let ignored: std::collections::HashSet<String> = output
-        .stdout
-        .split(|&b| b == 0)
-        .filter(|s| !s.is_empty())
-        .map(|s| String::from_utf8_lossy(s).into_owned())
-        .collect();
-    candidates
-        .into_iter()
-        .filter(|p| !ignored.contains(&p.to_string_lossy().into_owned()))
         .cloned()
         .collect()
 }
@@ -551,11 +586,11 @@ fn spawn_watcher(
     root: PathBuf,
 ) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     let watcher_tx = tx.clone();
-    let watch_root = root.clone();
+    let ignore = RepoIgnore::load(&root);
     let mut debouncer = new_debouncer(Duration::from_secs(3), move |res: DebounceEventResult| {
         if let Ok(events) = res {
             let paths: Vec<PathBuf> = events.iter().map(|e| e.path.clone()).collect();
-            if !unignored_paths(&watch_root, &paths).is_empty() {
+            if !unignored_paths(&ignore, &paths).is_empty() {
                 let _ = watcher_tx.send("changed".to_string());
             }
         }
