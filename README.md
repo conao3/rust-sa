@@ -11,6 +11,77 @@ Crate name: `conao3-sa`. Executable: `sa`.
 Early development. The codebase is intentionally small and the API
 surfaces are not stable.
 
+## Install & run
+
+`conao3-sa` is published on crates.io
+([crates.io/crates/conao3-sa](https://crates.io/crates/conao3-sa)).
+
+### Prerequisites
+
+- Rust toolchain (1.95+) — install via [rustup](https://rustup.rs/) or
+  the Nix devShell (`nix develop`).
+- A `git` binary on `PATH` (the backend shells out to it).
+- For the Tauri shell on Linux: `webkit2gtk-4.1`, `libsoup-3`,
+  `gtk3` (see the Tauri docs for your distro).
+
+### Option A — install from crates.io
+
+```bash
+cargo install conao3-sa
+```
+
+This drops two executables into `~/.cargo/bin`:
+
+| Binary  | What it does                                                       |
+| ------- | ------------------------------------------------------------------ |
+| `sa`    | Tauri desktop shell — opens a WebView window on `https://sa.localhost` |
+| `serve` | Headless axum backend at `127.0.0.1:4000` (GraphQL + REST + SSE)   |
+
+⚠️ The published crate ships only the Rust sources; the **frontend
+bundle is not yet packaged**. Until a release with bundled assets is
+cut, you'll want Option B for an end-to-end install. `serve` alone is
+useful if you only need the backend (e.g. to drive a custom client).
+
+### Option B — install from source (with frontend)
+
+```bash
+git clone https://github.com/conao3/rust-sa
+cd rust-sa
+
+# bring in the toolchain (Nix devShell provides node, pnpm, cargo-tauri,
+# cargo-watch). Skip if you already have everything.
+direnv allow   # or: nix develop
+
+# build the frontend once into frontend/dist
+cd frontend && pnpm install && pnpm build && cd ..
+
+# install the Tauri shell into ~/.cargo/bin (this re-bundles frontend/dist)
+cargo install --path src-tauri --bin sa
+```
+
+### Launching
+
+```bash
+# Desktop UI (Tauri WebView)
+sa
+
+# Or headless backend + browser
+serve &
+# then open https://sa.localhost  (frontend dev server) or the URL of
+# your own static deployment of frontend/dist
+```
+
+The first time you launch, you'll be on `/` — point it at any local
+repo via the folder picker and you'll land in `/browse`. From there
+`graph` / `diff` are linked in the top bar.
+
+### Preferences
+
+Theme is persisted to `~/.config/sa/config.toml`. Everything else
+(layout, density, pane widths, recents, comments, viewed state) lives
+in browser `localStorage`.
+
+
 ## Stack
 
 - **Backend** (`src-tauri/`) — Rust, axum, async-graphql, Tauri 2.
@@ -89,8 +160,9 @@ repository. There is no implicit default.
 
 ## Development
 
-Requires Nix with flakes (provides rust, node 24, pnpm 10, cargo-tauri,
-cargo-watch). Otherwise install those tools manually.
+For working on rust-sa itself (auto-rebuild backend, vite HMR for
+frontend). Requires Nix with flakes (provides rust, node 24, pnpm 10,
+cargo-tauri, cargo-watch). Otherwise install those tools manually.
 
 ```bash
 # enter devShell
