@@ -85,7 +85,7 @@ in browser `localStorage`.
 ## Stack
 
 - **Backend** (`src-tauri/`) — Rust, axum, async-graphql, Tauri 2.
-  Shells out to `git` for diff / log / show / ls-tree;
+  Shells out to `git` for diff / log / show / ls-tree / for-each-ref;
   serves GraphQL at `/api/graphql` and SSE at `/api/events`.
   Per-repo file watcher via notify-debouncer-mini, filtered through the
   `ignore` crate so nested `.gitignore` and global excludes are honored.
@@ -189,6 +189,10 @@ make fmt      # treefmt (rustfmt + prettier + nixfmt) + oxfmt --write
 
 ## Notable design choices
 
+- `/browse` caches blob fetches **and** Shiki highlight output by URL
+  and `(path, theme, content prefix)`, so flipping between files is
+  instant after the first visit. The `loading…` indicator is deferred
+  200 ms — cache hits never get to show it, only cold fetches do.
 - `ignore` crate is used in the watcher so SSE only fires for paths the
   target repo actually cares about (nested `.gitignore`, `info/exclude`,
   global excludes via `core.excludesFile`). Directory-level notify
