@@ -10,6 +10,7 @@ import { Button } from '#/components/ui/button'
 import { Tag } from '#/components/ui/tag'
 import { cn } from '#/lib/cn'
 import { usePreference, useRootAttribute } from '#/lib/preference'
+import { shortSha } from '#/lib/short-sha'
 
 interface GraphSearch {
   repo?: string
@@ -97,8 +98,8 @@ function GraphPage() {
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
-        base={base ?? '—'}
-        head={head ?? '—'}
+        base={base ? shortSha(base) : '—'}
+        head={head ? shortSha(head) : '—'}
         separator={threeDot ? '···' : '··'}
         mode={mode}
         onModeChange={setMode}
@@ -224,12 +225,12 @@ function GraphSummary({
       <span className="text-xs uppercase tracking-wider text-mute">compare</span>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-rust" />
-        {base ?? '—'}
+        {base ? shortSha(base) : '—'}
       </span>
       <span className="text-faint">{threeDot ? '···' : '··'}</span>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-moss" />
-        {head ?? '—'}
+        {head ? shortSha(head) : '—'}
       </span>
       <Button variant="ghost" size="sm" onPress={onToggleThreeDot}>
         <Split size={16} aria-hidden="true" />

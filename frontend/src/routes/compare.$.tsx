@@ -9,6 +9,7 @@ import { LiveToast } from '#/components/live-toast'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { API_ORIGIN } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
+import { shortSha } from '#/lib/short-sha'
 import { useComments } from '#/lib/comments'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useSSE } from '#/lib/sse'
@@ -174,8 +175,8 @@ function ComparePage() {
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
       <TopBar
-        base={base}
-        head={separator ? head : base}
+        base={shortSha(base)}
+        head={shortSha(separator ? head : base)}
         separator={separator ?? '··'}
         mode={mode}
         onModeChange={setMode}
