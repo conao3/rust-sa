@@ -8,13 +8,14 @@ use axum::{
     Extension, Router,
 };
 use futures::stream::Stream;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
     convert::Infallible,
     net::SocketAddr,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::Duration,
 };
@@ -487,31 +488,30 @@ fn build_router(schema: AppSchema) -> Router {
         )
 }
 
-const IGNORED_SEGMENTS: &[&str] = &[
-    "/.git/",
-    "/target/",
-    "/node_modules/",
-    "/.tanstack/",
-    "/.output/",
-    "/.nitro/",
-    "/dist/",
-    "/.direnv/",
-    "/.next/",
-    "/.turbo/",
-    "/.cache/",
-    "/.parcel-cache/",
-    "/.svelte-kit/",
-    "/.docusaurus/",
-    "/.firebase/",
-    "/coverage/",
-    "/.idea/",
-    "/.vscode/",
-    "/.DS_Store",
-];
+fn build_repo_ignore(repo: &Path) -> Gitignore {
+    let mut builder = GitignoreBuilder::new(repo);
+    let _ = builder.add(repo.join(".gitignore"));
+    let _ = builder.add(repo.join(".git/info/exclude"));
+    builder.build().unwrap_or_else(|_| Gitignore::empty())
+}
 
-fn is_interesting(path: &std::path::Path) -> bool {
-    let p = path.to_string_lossy();
-    !IGNORED_SEGMENTS.iter().any(|seg| p.contains(seg))
+fn is_interesting(repo: &Path, path: &Path, repo_gi: &Gitignore, global_gi: &Gitignore) -> bool {
+    let s = path.to_string_lossy();
+    if s.contains("/.git/") || s.ends_with("/.git") {
+        return false;
+    }
+    let rel = path.strip_prefix(repo).unwrap_or(path);
+    let is_dir = path.is_dir();
+    if repo_gi.matched_path_or_any_parents(rel, is_dir).is_ignore() {
+        return false;
+    }
+    if global_gi
+        .matched_path_or_any_parents(rel, is_dir)
+        .is_ignore()
+    {
+        return false;
+    }
+    true
 }
 
 fn spawn_watcher(
@@ -519,9 +519,15 @@ fn spawn_watcher(
     root: PathBuf,
 ) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     let watcher_tx = tx.clone();
+    let repo_gi = build_repo_ignore(&root);
+    let (global_gi, _) = Gitignore::global();
+    let watch_root = root.clone();
     let mut debouncer = new_debouncer(Duration::from_millis(250), move |res: DebounceEventResult| {
         if let Ok(events) = res {
-            if events.iter().any(|e| is_interesting(&e.path)) {
+            if events
+                .iter()
+                .any(|e| is_interesting(&watch_root, &e.path, &repo_gi, &global_gi))
+            {
                 let _ = watcher_tx.send("changed".to_string());
             }
         }
