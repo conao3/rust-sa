@@ -7,7 +7,7 @@ import { BrandMark } from '#/components/brand-mark'
 import { FileTreeView } from '#/components/file-tree-view'
 import { GitHubLink } from '#/components/github-link'
 import { ResizeHandle } from '#/components/ui/resize-handle'
-import { API_ORIGIN } from '#/lib/apollo'
+import { fetchBlob } from '#/lib/blob-cache'
 import { highlightCode } from '#/lib/highlight'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
@@ -158,12 +158,7 @@ function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string
     setLoading(true)
     setError(null)
     setHtml('')
-    const url = `${API_ORIGIN}/api/blob?rev=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}&repo=${encodeURIComponent(repo)}`
-    fetch(url)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
-        return r.text()
-      })
+    fetchBlob(rev, repo, path)
       .then((text) => {
         if (!cancelled) {
           setBody(text)
