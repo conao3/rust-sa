@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
+import { ResizeHandle } from '#/components/ui/resize-handle'
 import { Tag } from '#/components/ui/tag'
 import clsx from 'clsx'
 import { DiffView } from '#/components/diff-view'
@@ -90,6 +91,8 @@ function GraphPage() {
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme] = useThemePreference()
   const [density] = usePreference<'compact' | 'regular' | 'comfy'>('rust-sa:density', 'regular')
+  const [commitsWStr, setCommitsWStr] = usePreference<string>('rust-sa:graph-commits-w', '420')
+  const commitsW = Number(commitsWStr) || 420
   const [helpOpen, setHelpOpen] = useState(false)
   const [base, setBase] = useState<string | null>(null)
   const [head, setHead] = useState<string | null>(null)
@@ -165,8 +168,11 @@ function GraphPage() {
         viewedCount={0}
         totalCount={0}
       />
-      <div className="border-t border-hairline grid grid-cols-[420px_1fr] min-h-0">
-        <aside className="bg-bg-soft border-r border-hairline overflow-y-auto">
+      <div
+        className="border-t border-hairline grid min-h-0"
+        style={{ gridTemplateColumns: `${commitsW}px auto 1fr` }}
+      >
+        <aside className="bg-bg-soft border-r border-hairline overflow-y-auto min-w-0">
           <div className="sticky top-0 z-10 bg-bg-soft border-b border-hairline-soft px-4 pt-4 pb-2 font-mono text-xs uppercase tracking-widest text-mute flex items-center gap-1.5">
             <GitCommitHorizontal size={16} aria-hidden="true" />
             commits
@@ -187,7 +193,14 @@ function GraphPage() {
             exhausted={exhausted}
           />
         </aside>
-        <main className="relative overflow-hidden bg-bg">
+        <ResizeHandle
+          width={commitsW}
+          onWidthChange={(w) => setCommitsWStr(String(Math.round(w)))}
+          min={280}
+          max={900}
+          ariaLabel="resize commits pane"
+        />
+        <main className="relative overflow-hidden bg-bg min-w-0">
           {previewSpec ? (
             <DiffPreview
               rev={previewSpec}
@@ -246,6 +259,8 @@ function DiffPreview({
   theme: Theme
   commit: Commit | null
 }) {
+  const [treeWStr, setTreeWStr] = usePreference<string>('rust-sa:graph-tree-w', '280')
+  const treeW = Number(treeWStr) || 280
   const { data, loading, error } = useQuery<{ files: PreviewFile[] }>(PREVIEW_FILES_QUERY, {
     variables: { rev, repo },
     fetchPolicy: 'cache-and-network',
@@ -280,7 +295,10 @@ function DiffPreview({
   }
 
   return (
-    <div className="absolute inset-0 pb-20 grid grid-cols-[var(--tree-w)_1fr] min-h-0">
+    <div
+      className="absolute inset-0 pb-20 grid min-h-0"
+      style={{ gridTemplateColumns: `${treeW}px auto 1fr` }}
+    >
       <aside className="bg-bg-soft border-r border-hairline min-h-0 overflow-hidden">
         <FileTreeView
           paths={paths}
@@ -288,6 +306,13 @@ function DiffPreview({
           header={<PreviewTreeHeader count={paths.length} />}
         />
       </aside>
+      <ResizeHandle
+        width={treeW}
+        onWidthChange={(w) => setTreeWStr(String(Math.round(w)))}
+        min={200}
+        max={600}
+        ariaLabel="resize file tree"
+      />
       <div className="overflow-y-auto min-w-0">
         {commit && <CommitMeta commit={commit} />}
         {body}

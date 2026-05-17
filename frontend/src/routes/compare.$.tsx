@@ -6,6 +6,7 @@ import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
+import { ResizeHandle } from '#/components/ui/resize-handle'
 import { TopBar, type Mode, type View } from '#/components/top-bar'
 import { API_ORIGIN } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
@@ -100,6 +101,8 @@ function ComparePage() {
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme] = useThemePreference()
   const [density, setDensity] = usePreference<Density>('rust-sa:density', 'regular')
+  const [treeWStr, setTreeWStr] = usePreference<string>('rust-sa:compare-tree-w', '280')
+  const treeW = Number(treeWStr) || 280
   const [helpOpen, setHelpOpen] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState(0)
 
@@ -191,7 +194,10 @@ function ComparePage() {
         clearPromptsLabel={`clear ${comments.length}`}
         isLive
       />
-      <div className="grid grid-cols-[var(--tree-w)_1fr] min-h-0 border-t border-hairline">
+      <div
+        className="grid min-h-0 border-t border-hairline"
+        style={{ gridTemplateColumns: `${treeW}px auto 1fr` }}
+      >
         <aside className="bg-bg-soft border-r border-hairline min-h-0 overflow-hidden">
           <FileTreeView
             paths={paths}
@@ -199,6 +205,13 @@ function ComparePage() {
             header={<TreeHeader count={paths.length} />}
           />
         </aside>
+        <ResizeHandle
+          width={treeW}
+          onWidthChange={(w) => setTreeWStr(String(Math.round(w)))}
+          min={200}
+          max={600}
+          ariaLabel="resize file tree"
+        />
         <main className="overflow-y-auto bg-bg min-w-0">
           <DiffView
             rev={rev}
