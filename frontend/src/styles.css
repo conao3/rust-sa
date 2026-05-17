@@ -154,7 +154,6 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--hairline) transparent;
-  scrollbar-gutter: stable;
 }
 *:hover {
   scrollbar-color: var(--faint) transparent;
