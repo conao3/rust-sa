@@ -1,11 +1,12 @@
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { File } from 'lucide-react'
+import { File, FileDiff, GitGraph } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FileTreeView } from '#/components/file-tree-view'
 import { ResizeHandle } from '#/components/ui/resize-handle'
 import { API_ORIGIN } from '#/lib/apollo'
+import { highlightCode } from '#/lib/highlight'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
 
@@ -77,6 +78,25 @@ function BrowsePage() {
         <span className="text-mute pl-4 border-l border-hairline truncate">{repo}</span>
         <span className="text-faint">@</span>
         <span className="text-ink">{rev}</span>
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            to="/compare/$"
+            params={{ _splat: 'HEAD' }}
+            search={{ repo }}
+            className="inline-flex items-center gap-1.5 text-mute hover:text-ink"
+          >
+            <FileDiff size={16} aria-hidden="true" />
+            diff
+          </Link>
+          <Link
+            to="/graph"
+            search={{ repo }}
+            className="inline-flex items-center gap-1.5 text-mute hover:text-ink"
+          >
+            <GitGraph size={16} aria-hidden="true" />
+            graph
+          </Link>
+        </div>
       </header>
       <div
         className="grid min-h-0 border-t border-hairline"
@@ -125,12 +145,16 @@ function BrowsePage() {
 
 function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string }) {
   const [body, setBody] = useState<string>('')
+  const [html, setHtml] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [theme] = useThemePreference()
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setHtml('')
     const url = `${API_ORIGIN}/api/blob?rev=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}&repo=${encodeURIComponent(repo)}`
     fetch(url)
       .then(async (r) => {
@@ -154,6 +178,24 @@ function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string
     }
   }, [rev, repo, path])
 
+  useEffect(() => {
+    if (!body) {
+      setHtml('')
+      return
+    }
+    let cancelled = false
+    highlightCode(body, path, theme)
+      .then((h) => {
+        if (!cancelled) setHtml(h)
+      })
+      .catch(() => {
+        if (!cancelled) setHtml('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [body, path, theme])
+
   return (
     <div className="flex flex-col h-full">
       <header className="sticky top-0 z-10 px-4 py-2 bg-bg border-b border-hairline flex items-center gap-2 font-mono text-xs">
@@ -163,7 +205,13 @@ function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string
       <div className="flex-1 overflow-auto">
         {loading && <div className="px-4 py-3 font-mono text-xs text-mute">loading…</div>}
         {error && <div className="px-4 py-3 font-mono text-xs text-crimson">{error}</div>}
-        {!loading && !error && (
+        {!loading && !error && html && (
+          <div
+            className="shiki-host px-4 py-3 font-mono text-xs"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
+        {!loading && !error && !html && (
           <pre className="m-0 px-4 py-3 font-mono text-xs whitespace-pre text-ink">{body}</pre>
         )}
       </div>
