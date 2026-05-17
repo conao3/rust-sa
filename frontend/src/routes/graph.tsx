@@ -9,6 +9,7 @@ import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
 import { Tag } from '#/components/ui/tag'
 import clsx from 'clsx'
+import { DiffView } from '#/components/diff-view'
 import { GraphColumn } from '#/components/graph-column'
 import { layoutGraph, type GraphNode } from '#/lib/git-graph'
 import { usePreference, useRootAttribute } from '#/lib/preference'
@@ -56,6 +57,24 @@ const COMMITS_QUERY = gql`
   }
 `
 
+interface PreviewFile {
+  path: string
+  status: string
+  additions: number
+  deletions: number
+}
+
+const PREVIEW_FILES_QUERY = gql`
+  query PreviewFiles($rev: String!, $repo: String!) {
+    files(rev: $rev, repo: $repo) {
+      path
+      status
+      additions
+      deletions
+    }
+  }
+`
+
 function GraphPage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
@@ -93,10 +112,11 @@ function GraphPage() {
       navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
   }
 
+  const previewSpec = base ? (head ? `${base}${threeDot ? '...' : '..'}${head}` : base) : null
+
   const openDiff = () => {
-    if (!base) return
-    const spec = head ? `${base}${threeDot ? '...' : '..'}${head}` : base
-    navigate({ to: '/compare/$', params: { _splat: spec }, search: { repo } })
+    if (!previewSpec) return
+    navigate({ to: '/compare/$', params: { _splat: previewSpec }, search: { repo } })
   }
 
   return (
@@ -125,9 +145,13 @@ function GraphPage() {
           <CommitList commits={commits} base={base} head={head} onRowClick={onRowClick} />
         </aside>
         <main className="relative overflow-hidden bg-bg">
-          <div className="absolute inset-0 flex items-center justify-center font-serif text-4xl tracking-tight text-faint">
-            pick two commits.
-          </div>
+          {previewSpec ? (
+            <DiffPreview rev={previewSpec} repo={repo} layout={mode} theme={theme} />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center font-serif text-4xl tracking-tight text-faint">
+              pick a commit.
+            </div>
+          )}
           <GraphSummary
             base={base}
             head={head}
@@ -142,6 +166,50 @@ function GraphPage() {
         </main>
       </div>
       <HelpSheet isOpen={helpOpen} onOpenChange={setHelpOpen} />
+    </div>
+  )
+}
+
+function DiffPreview({
+  rev,
+  repo,
+  layout,
+  theme,
+}: {
+  rev: string
+  repo: string
+  layout: Mode
+  theme: Theme
+}) {
+  const { data, loading, error } = useQuery<{ files: PreviewFile[] }>(PREVIEW_FILES_QUERY, {
+    variables: { rev, repo },
+    fetchPolicy: 'cache-and-network',
+  })
+  const files = data?.files ?? []
+  if (loading && files.length === 0) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-mute">
+        loading diff…
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="absolute inset-0 flex items-start justify-center px-6 pt-10 font-mono text-xs text-crimson">
+        {error.message}
+      </div>
+    )
+  }
+  if (files.length === 0) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-mute">
+        no changes in this range
+      </div>
+    )
+  }
+  return (
+    <div className="absolute inset-0 pb-20 overflow-y-auto">
+      <DiffView rev={rev} refreshKey={0} files={files} repo={repo} layout={layout} theme={theme} />
     </div>
   )
 }
