@@ -2,7 +2,15 @@ import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { ArrowUp, Check, File, Folder, GitBranch, Home, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Dialog, Modal, ModalOverlay, type ModalOverlayProps } from 'react-aria-components'
+import {
+  Button as AriaButton,
+  Dialog,
+  Input,
+  Modal,
+  ModalOverlay,
+  SearchField,
+  type ModalOverlayProps,
+} from 'react-aria-components'
 import { Button } from '#/components/ui/button'
 import { fuzzyScore } from '#/lib/fuzzy'
 import clsx from 'clsx'
@@ -91,39 +99,33 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
             </span>
           </div>
           <Breadcrumb path={listing?.path ?? cwd ?? ''} onNavigate={setCwd} />
-          <div className="px-5 py-2 border-b border-hairline-soft flex items-center gap-2 font-mono text-xs text-mute">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            onSubmit={() => {
+              if (entries.length > 0 && entries[0].isDir) enter(entries[0].name)
+            }}
+            aria-label="Filter entries"
+            className="group px-5 py-2 border-b border-hairline-soft flex items-center gap-2 font-mono text-xs text-mute"
+          >
             <Search size={16} aria-hidden="true" className="text-faint flex-shrink-0" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (entries.length > 0 && entries[0].isDir) {
-                    e.preventDefault()
-                    enter(entries[0].name)
-                  }
-                }
-              }}
+            <Input
               placeholder="type to filter…"
               autoFocus
               className="flex-1 bg-transparent text-ink outline-none placeholder:text-faint"
             />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="clear filter"
-                className="text-faint hover:text-ink cursor-pointer inline-flex items-center"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            )}
+            <AriaButton
+              slot="clear"
+              aria-label="clear filter"
+              className="group-data-[empty]:hidden text-faint hover:text-ink cursor-pointer inline-flex items-center"
+            >
+              <X size={16} aria-hidden="true" />
+            </AriaButton>
             <span className="text-faint">
               {entries.length}
               {query ? ` / ${baseEntries.length}` : ''}
             </span>
-          </div>
+          </SearchField>
           <div className="flex-1 overflow-y-auto">
             {loading && <div className="px-5 py-4 font-mono text-xs text-mute">loading…</div>}
             {error && (

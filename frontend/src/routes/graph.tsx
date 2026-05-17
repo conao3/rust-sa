@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { Button as AriaButton, Input as AriaInput, SearchField } from 'react-aria-components'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
@@ -548,27 +549,26 @@ function RefSection({
       {open && (
         <>
           {refs.length > 5 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-hairline-soft font-mono text-xs text-mute">
+            <SearchField
+              value={query}
+              onChange={setQuery}
+              aria-label={`Filter ${title}`}
+              className="group flex items-center gap-1.5 px-3 py-1.5 border-b border-hairline-soft font-mono text-xs text-mute"
+            >
               <Search size={14} aria-hidden="true" className="text-faint flex-shrink-0" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+              <AriaInput
                 placeholder={`filter ${title}…`}
                 className="flex-1 bg-transparent text-ink outline-none placeholder:text-faint min-w-0"
               />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  aria-label="clear filter"
-                  className="text-faint hover:text-ink cursor-pointer inline-flex items-center"
-                >
-                  <X size={14} aria-hidden="true" />
-                </button>
-              )}
-              {query && <span className="text-faint">{filtered.length}</span>}
-            </div>
+              <AriaButton
+                slot="clear"
+                aria-label="clear filter"
+                className="group-data-[empty]:hidden text-faint hover:text-ink cursor-pointer inline-flex items-center"
+              >
+                <X size={14} aria-hidden="true" />
+              </AriaButton>
+              <span className="text-faint group-data-[empty]:hidden">{filtered.length}</span>
+            </SearchField>
           )}
           {filtered.length === 0 && (
             <div className="px-3 py-2 font-mono text-xs text-mute">no matches</div>
