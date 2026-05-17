@@ -83,14 +83,24 @@ function detectLang(path: string): BundledLanguage | 'text' {
   return EXT_LANG[ext] ?? 'text'
 }
 
-export async function highlightCode(
+const cache = new Map<string, Promise<string>>()
+
+export function highlightCode(
   code: string,
   path: string,
   theme: 'light' | 'dark',
 ): Promise<string> {
   const lang = detectLang(path)
-  return codeToHtml(code, {
+  const key = `${theme}:${lang}:${path}:${code.length}:${code.slice(0, 64)}`
+  const existing = cache.get(key)
+  if (existing) return existing
+  const promise = codeToHtml(code, {
     lang,
     theme: theme === 'dark' ? 'github-dark' : 'github-light',
+  }).catch((err: unknown) => {
+    cache.delete(key)
+    throw err
   })
+  cache.set(key, promise)
+  return promise
 }

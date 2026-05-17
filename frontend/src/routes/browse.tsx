@@ -146,53 +146,55 @@ function BrowsePage() {
   )
 }
 
+interface BlobState {
+  body: string
+  html: string
+  loading: boolean
+  error: string | null
+}
+
 function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string }) {
-  const [body, setBody] = useState<string>('')
-  const [html, setHtml] = useState<string>('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [state, setState] = useState<BlobState>({
+    body: '',
+    html: '',
+    loading: true,
+    error: null,
+  })
   const [theme] = useThemePreference()
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
-    setHtml('')
+    setState((s) => ({ ...s, error: null }))
+    let loadingTimer = window.setTimeout(() => {
+      if (!cancelled) setState((s) => ({ ...s, loading: true }))
+    }, 200)
+
     fetchBlob(rev, repo, path)
-      .then((text) => {
-        if (!cancelled) {
-          setBody(text)
-          setLoading(false)
-        }
+      .then(async (text) => {
+        if (cancelled) return null
+        const html = await highlightCode(text, path, theme).catch(() => '')
+        return { text, html }
+      })
+      .then((result) => {
+        if (cancelled || !result) return
+        window.clearTimeout(loadingTimer)
+        setState({ body: result.text, html: result.html, loading: false, error: null })
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
-          setLoading(false)
-        }
+        if (cancelled) return
+        window.clearTimeout(loadingTimer)
+        setState({
+          body: '',
+          html: '',
+          loading: false,
+          error: err instanceof Error ? err.message : String(err),
+        })
       })
     return () => {
       cancelled = true
+      window.clearTimeout(loadingTimer)
     }
-  }, [rev, repo, path])
-
-  useEffect(() => {
-    if (!body) {
-      setHtml('')
-      return
-    }
-    let cancelled = false
-    highlightCode(body, path, theme)
-      .then((h) => {
-        if (!cancelled) setHtml(h)
-      })
-      .catch(() => {
-        if (!cancelled) setHtml('')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [body, path, theme])
+  }, [rev, repo, path, theme])
 
   return (
     <div className="flex flex-col h-full">
@@ -201,16 +203,20 @@ function BlobPane({ rev, repo, path }: { rev: string; repo: string; path: string
         <span className="text-ink truncate">{path}</span>
       </header>
       <div className="flex-1 overflow-auto">
-        {loading && <div className="px-4 py-3 font-mono text-xs text-mute">loading…</div>}
-        {error && <div className="px-4 py-3 font-mono text-xs text-crimson">{error}</div>}
-        {!loading && !error && html && (
+        {state.loading && <div className="px-4 py-3 font-mono text-xs text-mute">loading…</div>}
+        {state.error && (
+          <div className="px-4 py-3 font-mono text-xs text-crimson">{state.error}</div>
+        )}
+        {!state.loading && !state.error && state.html && (
           <div
             className="shiki-host px-4 py-3 font-mono text-xs"
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: state.html }}
           />
         )}
-        {!loading && !error && !html && (
-          <pre className="m-0 px-4 py-3 font-mono text-xs whitespace-pre text-ink">{body}</pre>
+        {!state.loading && !state.error && !state.html && (
+          <pre className="m-0 px-4 py-3 font-mono text-xs whitespace-pre text-ink">
+            {state.body}
+          </pre>
         )}
       </div>
     </div>
