@@ -1,7 +1,7 @@
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { DiffView } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
@@ -9,8 +9,8 @@ import { LiveToast } from '#/components/live-toast'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import { API_ORIGIN } from '#/lib/apollo'
+import { useHotkeys } from '@tanstack/react-hotkeys'
 import { useComments } from '#/lib/comments'
-import { useKeybindings } from '#/lib/keybindings'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useSSE } from '#/lib/sse'
 import { useViewed } from '#/lib/viewed'
@@ -42,7 +42,8 @@ const FILES_QUERY = gql`
 
 type Density = 'compact' | 'regular' | 'comfy'
 const DENSITIES: Density[] = ['compact', 'regular', 'comfy']
-const nextDensity = (d: Density): Density => DENSITIES[(DENSITIES.indexOf(d) + 1) % DENSITIES.length]
+const nextDensity = (d: Density): Density =>
+  DENSITIES[(DENSITIES.indexOf(d) + 1) % DENSITIES.length]
 
 interface LoaderData {
   rev: string
@@ -116,7 +117,7 @@ function ComparePage() {
     variables: { rev, repo },
     skip: refreshKey === 0,
   })
-  const liveFiles = refreshKey === 0 ? files : data?.files ?? files
+  const liveFiles = refreshKey === 0 ? files : (data?.files ?? files)
   const [livePulse, setLivePulse] = useState(false)
   useSSE(`${API_ORIGIN}/api/events?repo=${encodeURIComponent(repo)}`, () => {
     setRefreshKey((k) => k + 1)
@@ -124,11 +125,8 @@ function ComparePage() {
     setLivePulse(true)
     window.setTimeout(() => setLivePulse(false), 2500)
   })
-  const fileEntries = useMemo(
-    () => liveFiles.map((f) => ({ path: f.path, status: gitStatusKey(f.status) })),
-    [liveFiles],
-  )
-  const paths = useMemo(() => fileEntries.map((f) => f.path), [fileEntries])
+  const fileEntries = liveFiles.map((f) => ({ path: f.path, status: gitStatusKey(f.status) }))
+  const paths = fileEntries.map((f) => f.path)
   const { isViewed, toggle } = useViewed(rev)
   const viewedCount = paths.filter((p) => isViewed(p)).length
   const { comments, add: addComment, remove: removeComment } = useComments(rev)
@@ -136,15 +134,21 @@ function ComparePage() {
   const currentPath = paths[focusedIndex] ?? paths[0]
   const { base, head, separator } = parseSpec(rev)
 
-  useKeybindings({
-    '?': () => setHelpOpen((o) => !o),
-    s: () => setMode(mode === 'unified' ? 'split' : 'unified'),
-    '.': () => setDensity(nextDensity(density)),
-    v: () => currentPath && toggle(currentPath),
-    ']': () => paths.length && setFocusedIndex((i) => Math.min(i + 1, paths.length - 1)),
-    '[': () => paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)),
-    g: () => navigate({ to: '/graph', search: { repo } }),
-  })
+  useHotkeys(
+    [
+      { hotkey: { key: '/', shift: true }, callback: () => setHelpOpen((o) => !o) },
+      { hotkey: 'S', callback: () => setMode(mode === 'unified' ? 'split' : 'unified') },
+      { hotkey: '.', callback: () => setDensity(nextDensity(density)) },
+      { hotkey: 'V', callback: () => currentPath && toggle(currentPath) },
+      {
+        hotkey: ']',
+        callback: () => paths.length && setFocusedIndex((i) => Math.min(i + 1, paths.length - 1)),
+      },
+      { hotkey: '[', callback: () => paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)) },
+      { hotkey: 'G', callback: () => navigate({ to: '/graph', search: { repo } }) },
+    ],
+    { preventDefault: true, ignoreInputs: true },
+  )
 
   return (
     <div className="grid grid-rows-[var(--topbar-h)_1fr] h-screen bg-bg text-ink">
@@ -181,10 +185,7 @@ function ComparePage() {
             theme={theme}
             comments={comments}
             renderHeaderMetadata={(file) => (
-              <ViewedCheck
-                isOn={isViewed(file.name)}
-                onToggle={() => toggle(file.name)}
-              />
+              <ViewedCheck isOn={isViewed(file.name)} onToggle={() => toggle(file.name)} />
             )}
             onAddComment={(input) => addComment({ ...input, author: 'you' })}
             onDeleteComment={removeComment}
@@ -199,11 +200,9 @@ function ComparePage() {
 
 function TreeHeader({ count }: { count: number }) {
   return (
-    <div className="px-3 pt-4 pb-3 border-b border-hairline flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.08em] text-mute">
+    <div className="px-3 pt-4 pb-3 border-b border-hairline flex items-center justify-between font-mono text-xs uppercase tracking-widest text-mute">
       <span>files</span>
-      <span className="text-ink normal-case tracking-normal text-[11px]">
-        0 / {count} viewed
-      </span>
+      <span className="text-ink normal-case tracking-normal text-xs">0 / {count} viewed</span>
     </div>
   )
 }

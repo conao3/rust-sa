@@ -1,5 +1,6 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { ApolloProvider } from '@apollo/client/react'
+import { HotkeysProvider } from '@tanstack/react-hotkeys'
+import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { apolloClient } from '../lib/apollo'
 
 import appCss from '../styles.css?url'
@@ -39,7 +40,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
+        <ApolloProvider client={apolloClient}>
+          <HotkeysProvider>{children}</HotkeysProvider>
+        </ApolloProvider>
         <Scripts />
       </body>
     </html>

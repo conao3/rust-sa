@@ -1,13 +1,14 @@
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
+import { useHotkeys } from '@tanstack/react-hotkeys'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { FileDiff, GitCommitHorizontal, RotateCcw, Split } from 'lucide-react'
 import { useState, type MouseEvent } from 'react'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
 import { Tag } from '#/components/ui/tag'
 import { cn } from '#/lib/cn'
-import { useKeybindings } from '#/lib/keybindings'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 
 interface GraphSearch {
@@ -54,10 +55,7 @@ function GraphPage() {
   const navigate = useNavigate()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme, setTheme] = usePreference<Theme>('rust-sa:theme', 'light')
-  const [density] = usePreference<'compact' | 'regular' | 'comfy'>(
-    'rust-sa:density',
-    'regular',
-  )
+  const [density] = usePreference<'compact' | 'regular' | 'comfy'>('rust-sa:density', 'regular')
   const [helpOpen, setHelpOpen] = useState(false)
   const [base, setBase] = useState<string | null>(null)
   const [head, setHead] = useState<string | null>(null)
@@ -72,10 +70,13 @@ function GraphPage() {
   })
   const commits = data?.commits ?? []
 
-  useKeybindings({
-    '?': () => setHelpOpen((o) => !o),
-    s: () => setMode(mode === 'unified' ? 'split' : 'unified'),
-  })
+  useHotkeys(
+    [
+      { hotkey: { key: '/', shift: true }, callback: () => setHelpOpen((o) => !o) },
+      { hotkey: 'S', callback: () => setMode(mode === 'unified' ? 'split' : 'unified') },
+    ],
+    { preventDefault: true, ignoreInputs: true },
+  )
 
   const onRowClick = (e: MouseEvent, sha: string) => {
     if (e.shiftKey) setHead(sha)
@@ -83,7 +84,8 @@ function GraphPage() {
   }
 
   const onViewChange = (next: View) => {
-    if (next === 'diff') navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
+    if (next === 'diff')
+      navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
   }
 
   const openDiff = () => {
@@ -110,17 +112,12 @@ function GraphPage() {
       />
       <div className="border-t border-hairline grid grid-cols-[420px_1fr] min-h-0">
         <aside className="bg-bg-soft border-r border-hairline overflow-y-auto">
-          <div className="px-4 pt-4 pb-2 font-mono text-[11px] uppercase tracking-[0.08em] text-mute">
+          <div className="px-4 pt-4 pb-2 font-mono text-xs uppercase tracking-widest text-mute inline-flex items-center gap-1.5">
+            <GitCommitHorizontal size={11} aria-hidden="true" />
             commits
           </div>
-          {loading && (
-            <div className="px-4 py-2 font-mono text-[12px] text-mute">loading…</div>
-          )}
-          {error && (
-            <div className="px-4 py-2 font-mono text-[12px] text-crimson">
-              {error.message}
-            </div>
-          )}
+          {loading && <div className="px-4 py-2 font-mono text-xs text-mute">loading…</div>}
+          {error && <div className="px-4 py-2 font-mono text-xs text-crimson">{error.message}</div>}
           {commits.map((c) => (
             <CommitRow
               key={c.sha}
@@ -132,7 +129,7 @@ function GraphPage() {
           ))}
         </aside>
         <main className="relative overflow-hidden bg-bg">
-          <div className="absolute inset-0 flex items-center justify-center font-serif text-[36px] tracking-[-0.02em] text-faint">
+          <div className="absolute inset-0 flex items-center justify-center font-serif text-4xl tracking-tight text-faint">
             pick two commits.
           </div>
           <GraphSummary
@@ -169,33 +166,27 @@ function CommitRow({
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left flex items-center gap-2.5 px-3 py-2 border-b border-hairline-soft font-mono text-[12px] cursor-pointer hover:bg-bg-card',
-        isBase && 'bg-[rgba(160,74,42,0.10)]',
-        isHead && 'bg-[rgba(79,122,106,0.16)]',
+        'w-full text-left flex items-center gap-2.5 px-3 py-2 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
+        isBase && 'bg-rust-soft',
+        isHead && 'bg-moss-soft',
       )}
     >
       <span className="text-rust">{commit.short}</span>
       <span className="text-ink flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
         {commit.message}
       </span>
-      {commit.refs && (
-        <RefBadges refs={commit.refs} isBase={isBase} isHead={isHead} />
-      )}
-      <span className="text-mute text-[11px] flex-shrink-0">{commit.when}</span>
+      {commit.refs && <RefBadges refs={commit.refs} isBase={isBase} isHead={isHead} />}
+      <span className="text-mute text-xs flex-shrink-0">{commit.when}</span>
     </button>
   )
 }
 
-function RefBadges({
-  refs,
-  isBase,
-  isHead,
-}: {
-  refs: string
-  isBase: boolean
-  isHead: boolean
-}) {
-  const parts = refs.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 2)
+function RefBadges({ refs, isBase, isHead }: { refs: string; isBase: boolean; isHead: boolean }) {
+  const parts = refs
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 2)
   return (
     <span className="inline-flex gap-1 flex-shrink-0">
       {parts.map((p) => {
@@ -230,10 +221,8 @@ function GraphSummary({
   onClear: () => void
 }) {
   return (
-    <div className="absolute left-5 right-5 bottom-5 bg-bg border border-hairline rounded-[4px] px-5 py-4 font-mono text-[12.5px] flex items-center gap-4">
-      <span className="text-[10.5px] uppercase tracking-[0.06em] text-mute">
-        compare
-      </span>
+    <div className="absolute left-5 right-5 bottom-5 bg-bg border border-hairline rounded-sm px-5 py-4 font-mono text-xs flex items-center gap-4">
+      <span className="text-xs uppercase tracking-wider text-mute">compare</span>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-rust" />
         {base ?? '—'}
@@ -244,13 +233,16 @@ function GraphSummary({
         {head ?? '—'}
       </span>
       <Button variant="ghost" size="sm" onPress={onToggleThreeDot}>
+        <Split size={11} aria-hidden="true" />
         {threeDot ? 'three-dot' : 'two-dot'}
       </Button>
       <span className="flex-1" />
       <Button variant="ghost" size="sm" onPress={onClear}>
+        <RotateCcw size={11} aria-hidden="true" />
         clear
       </Button>
       <Button variant="primary" size="sm" onPress={onOpen} isDisabled={!base}>
+        <FileDiff size={11} aria-hidden="true" />
         open diff
       </Button>
     </div>
