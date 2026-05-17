@@ -7,7 +7,6 @@ import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
-import { ViewedCheck } from '#/components/ui/viewed-check'
 import { API_ORIGIN } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { useComments } from '#/lib/comments'
@@ -209,9 +208,8 @@ function ComparePage() {
             layout={mode}
             theme={theme}
             comments={comments}
-            renderHeaderMetadata={(file) => (
-              <ViewedCheck isOn={isViewed(file.name)} onToggle={() => toggle(file.name)} />
-            )}
+            isViewed={isViewed}
+            onToggleViewed={toggle}
             onAddComment={(input) => addComment({ ...input, author: 'you' })}
             onDeleteComment={removeComment}
           />

@@ -1,12 +1,13 @@
 import { PatchDiff } from '@pierre/diffs/react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { CommentComposer } from '#/components/comment-composer'
 import { CommentThread } from '#/components/comment-thread'
+import { ViewedCheck } from '#/components/ui/viewed-check'
 import type { Comment, Side } from '#/lib/comments'
 import { useDiff } from '#/lib/diff-api'
 
 type PatchDiffProps = ComponentProps<typeof PatchDiff>
-type RenderHeaderMetadata = PatchDiffProps['renderHeaderMetadata']
 type RenderCustomHeader = PatchDiffProps['renderCustomHeader']
 interface SelectedLineRange {
   start: number
@@ -39,7 +40,8 @@ export interface DiffViewProps {
   theme?: 'light' | 'dark'
   className?: string
   comments?: Comment[]
-  renderHeaderMetadata?: RenderHeaderMetadata
+  isViewed?: (path: string) => boolean
+  onToggleViewed?: (path: string) => void
   onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
 }
@@ -54,7 +56,8 @@ export function DiffView({
   theme = 'light',
   className,
   comments,
-  renderHeaderMetadata,
+  isViewed,
+  onToggleViewed,
   onAddComment,
   onDeleteComment,
 }: DiffViewProps) {
@@ -73,7 +76,8 @@ export function DiffView({
           layout={layout}
           theme={theme}
           comments={comments?.filter((c) => c.path === f.path)}
-          renderHeaderMetadata={renderHeaderMetadata}
+          viewed={isViewed?.(f.path) ?? false}
+          onToggleViewed={onToggleViewed ? () => onToggleViewed(f.path) : undefined}
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
         />
@@ -93,7 +97,8 @@ interface FileBlockProps {
   layout: 'unified' | 'split'
   theme: 'light' | 'dark'
   comments?: Comment[]
-  renderHeaderMetadata?: RenderHeaderMetadata
+  viewed: boolean
+  onToggleViewed?: () => void
   onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
 }
@@ -115,7 +120,8 @@ function FileBlock({
   layout,
   theme,
   comments = [],
-  renderHeaderMetadata,
+  viewed,
+  onToggleViewed,
   onAddComment,
   onDeleteComment,
 }: FileBlockProps) {
@@ -124,7 +130,13 @@ function FileBlock({
   const [composing, setComposing] = useState<ComposingState | null>(null)
   const [composerBody, setComposerBody] = useState('')
   const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null)
+  const [collapsed, setCollapsed] = useState(viewed)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const handleToggleViewed = () => {
+    setCollapsed(!viewed)
+    onToggleViewed?.()
+  }
 
   useEffect(() => {
     const onDocPointerDown = (e: PointerEvent) => {
@@ -232,11 +244,13 @@ function FileBlock({
     return null
   }
 
-  const wrapperStyle: React.CSSProperties = {
-    minHeight: reservedHeight,
-    contentVisibility: 'auto',
-    containIntrinsicSize: `auto ${reservedHeight}px`,
-  }
+  const wrapperStyle: React.CSSProperties = collapsed
+    ? {}
+    : {
+        minHeight: reservedHeight,
+        contentVisibility: 'auto',
+        containIntrinsicSize: `auto ${reservedHeight}px`,
+      }
 
   if (loading && !patch) {
     return (
@@ -258,27 +272,42 @@ function FileBlock({
 
   return (
     <div ref={containerRef} style={wrapperStyle} className="relative">
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2 bg-bg border-b border-hairline">
+      <div className="sticky top-0 z-20 flex items-center gap-2 px-3 py-2 bg-bg border-b border-hairline">
+        <button
+          type="button"
+          aria-label={collapsed ? 'Expand file' : 'Collapse file'}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((c) => !c)}
+          className="inline-flex items-center justify-center w-6 h-6 rounded-sm text-mute hover:text-ink hover:bg-bg-card cursor-pointer flex-shrink-0"
+        >
+          {collapsed ? (
+            <ChevronRight size={16} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={16} aria-hidden="true" />
+          )}
+        </button>
         <span className="font-mono text-sm text-ink truncate">{path}</span>
         <span className="font-mono text-xs whitespace-nowrap">
           <span className="text-crimson">-{deletions}</span>
           <span className="text-faint"> </span>
           <span className="text-moss">+{additions}</span>
         </span>
-        <span className="ml-auto">
-          {renderHeaderMetadata?.({ name: path } as Parameters<
-            NonNullable<RenderHeaderMetadata>
-          >[0])}
-        </span>
+        {onToggleViewed && (
+          <span className="ml-auto">
+            <ViewedCheck isOn={viewed} onToggle={handleToggleViewed} />
+          </span>
+        )}
       </div>
-      <PatchDiff
-        patch={patch}
-        options={options}
-        lineAnnotations={annotations}
-        selectedLines={selectedLines}
-        renderCustomHeader={hideDefaultHeader}
-        renderAnnotation={renderAnnotation}
-      />
+      {!collapsed && (
+        <PatchDiff
+          patch={patch}
+          options={options}
+          lineAnnotations={annotations}
+          selectedLines={selectedLines}
+          renderCustomHeader={hideDefaultHeader}
+          renderAnnotation={renderAnnotation}
+        />
+      )}
     </div>
   )
 }
