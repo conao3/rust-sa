@@ -286,6 +286,32 @@ impl Query {
     async fn tags(&self, repo: String) -> async_graphql::Result<Vec<GitRef>> {
         run_for_each_ref(&repo, &["refs/tags"]).await
     }
+
+    async fn tree(
+        &self,
+        repo: String,
+        rev: Option<String>,
+    ) -> async_graphql::Result<Vec<String>> {
+        let rev = rev.unwrap_or_else(|| "HEAD".to_string());
+        let output = tokio::process::Command::new("git")
+            .current_dir(PathBuf::from(&repo))
+            .args(["ls-tree", "-r", "--name-only", "-z", &rev])
+            .output()
+            .await
+            .map_err(|e| async_graphql::Error::new(format!("git ls-tree: {e}")))?;
+        if !output.status.success() {
+            return Err(async_graphql::Error::new(format!(
+                "git ls-tree {rev}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+        Ok(output
+            .stdout
+            .split(|&b| b == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| String::from_utf8_lossy(s).into_owned())
+            .collect())
+    }
 }
 
 async fn run_for_each_ref(repo: &str, patterns: &[&str]) -> async_graphql::Result<Vec<GitRef>> {

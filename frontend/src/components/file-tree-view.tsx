@@ -9,6 +9,7 @@ export interface FileTreeViewProps {
   renderContextMenu?: ComponentProps<typeof FileTree>['renderContextMenu']
   style?: CSSProperties
   search?: boolean
+  onSelectionChange?: (selectedPaths: readonly string[]) => void
 }
 
 const THEME_STYLE: CSSProperties = {
@@ -28,11 +29,13 @@ export function FileTreeView({
   renderContextMenu,
   style,
   search = false,
+  onSelectionChange,
 }: FileTreeViewProps) {
   const { model } = useFileTree({
     initialExpansion: 'open',
     paths,
     search,
+    onSelectionChange,
   })
 
   useEffect(() => {

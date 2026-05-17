@@ -13,6 +13,7 @@ import { Route as PreferenceRouteImport } from './routes/preference'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as GraphRouteImport } from './routes/graph'
 import { Route as DesignRouteImport } from './routes/design'
+import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CompareSplatRouteImport } from './routes/compare.$'
 
@@ -36,6 +37,11 @@ const DesignRoute = DesignRouteImport.update({
   path: '/design',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrowseRoute = BrowseRouteImport.update({
+  id: '/browse',
+  path: '/browse',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const CompareSplatRoute = CompareSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/browse': typeof BrowseRoute
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/browse': typeof BrowseRoute
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/browse': typeof BrowseRoute
   '/design': typeof DesignRoute
   '/graph': typeof GraphRoute
   '/health': typeof HealthRoute
@@ -76,16 +85,25 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/browse'
     | '/design'
     | '/graph'
     | '/health'
     | '/preference'
     | '/compare/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design' | '/graph' | '/health' | '/preference' | '/compare/$'
+  to:
+    | '/'
+    | '/browse'
+    | '/design'
+    | '/graph'
+    | '/health'
+    | '/preference'
+    | '/compare/$'
   id:
     | '__root__'
     | '/'
+    | '/browse'
     | '/design'
     | '/graph'
     | '/health'
@@ -95,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BrowseRoute: typeof BrowseRoute
   DesignRoute: typeof DesignRoute
   GraphRoute: typeof GraphRoute
   HealthRoute: typeof HealthRoute
@@ -132,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/browse': {
+      id: '/browse'
+      path: '/browse'
+      fullPath: '/browse'
+      preLoaderRoute: typeof BrowseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -151,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BrowseRoute: BrowseRoute,
   DesignRoute: DesignRoute,
   GraphRoute: GraphRoute,
   HealthRoute: HealthRoute,

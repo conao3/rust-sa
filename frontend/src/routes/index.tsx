@@ -1,6 +1,15 @@
 import { useForm } from '@tanstack/react-form'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ExternalLink, FileDiff, Folder, GitFork, GitGraph, Palette, Settings } from 'lucide-react'
+import {
+  ExternalLink,
+  Eye,
+  FileDiff,
+  Folder,
+  GitFork,
+  GitGraph,
+  Palette,
+  Settings,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FolderPicker } from '#/components/folder-picker'
 import { Button } from '#/components/ui/button'
@@ -14,7 +23,7 @@ export const Route = createFileRoute('/')({
 
 interface RecentEntry {
   repo: string
-  spec: string
+  spec?: string
   visitedAt: string
 }
 
@@ -30,7 +39,7 @@ function loadRecents(): RecentEntry[] {
 }
 
 function pushRecent(entry: RecentEntry): RecentEntry[] {
-  const next = loadRecents().filter((r) => !(r.repo === entry.repo && r.spec === entry.spec))
+  const next = loadRecents().filter((r) => r.repo !== entry.repo)
   next.unshift(entry)
   const trimmed = next.slice(0, 8)
   window.localStorage.setItem(RECENTS_KEY, JSON.stringify(trimmed))
@@ -51,23 +60,32 @@ function HomePage() {
     setRecents(loadRecents())
   }, [])
 
+  const goBrowse = (repo: string) => {
+    setRecents(pushRecent({ repo, visitedAt: new Date().toISOString() }))
+    navigate({ to: '/browse', search: { repo } })
+  }
+
   const form = useForm({
-    defaultValues: { repo: '', spec: 'HEAD' },
+    defaultValues: { repo: '' },
     onSubmit: ({ value }) => {
       const repo = value.repo.trim()
-      const spec = value.spec.trim() || 'HEAD'
       if (!repo) return
-      setRecents(pushRecent({ repo, spec, visitedAt: new Date().toISOString() }))
-      navigate({ to: '/compare/$', params: { _splat: spec }, search: { repo } })
+      goBrowse(repo)
     },
   })
 
   const openGraph = () => {
     const repo = form.state.values.repo.trim()
-    const spec = form.state.values.spec.trim() || 'HEAD'
     if (!repo) return
-    setRecents(pushRecent({ repo, spec, visitedAt: new Date().toISOString() }))
+    setRecents(pushRecent({ repo, visitedAt: new Date().toISOString() }))
     navigate({ to: '/graph', search: { repo } })
+  }
+
+  const openDiff = () => {
+    const repo = form.state.values.repo.trim()
+    if (!repo) return
+    setRecents(pushRecent({ repo, visitedAt: new Date().toISOString() }))
+    navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
   }
 
   return (
@@ -131,32 +149,20 @@ function HomePage() {
                 </Field>
               )}
             </form.Field>
-            <form.Field name="spec">
-              {(field) => (
-                <Field
-                  label="spec"
-                  hint="git ref / range. e.g. HEAD · HEAD~3...HEAD · main..feature"
-                >
-                  <input
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    placeholder="HEAD"
-                    className="w-full h-9 px-3 rounded-sm border border-hairline bg-bg font-mono text-xs text-ink outline-none focus:border-rust"
-                  />
-                </Field>
-              )}
-            </form.Field>
             <form.Subscribe selector={(s) => s.values.repo.trim().length > 0}>
               {(hasRepo) => (
                 <div className="flex items-center gap-2 mt-1">
                   <Button type="submit" variant="primary" isDisabled={!hasRepo}>
+                    <Eye size={16} aria-hidden="true" />
+                    browse
+                  </Button>
+                  <Button variant="secondary" onPress={openDiff} isDisabled={!hasRepo}>
                     <FileDiff size={16} aria-hidden="true" />
-                    open diff
+                    diff (HEAD)
                   </Button>
                   <Button variant="secondary" onPress={openGraph} isDisabled={!hasRepo}>
                     <GitGraph size={16} aria-hidden="true" />
-                    open graph
+                    graph
                   </Button>
                 </div>
               )}
@@ -169,21 +175,16 @@ function HomePage() {
             <div className="font-mono text-xs uppercase tracking-widest text-mute">recent</div>
             <ul className="flex flex-col gap-1 border border-hairline rounded-sm divide-y divide-hairline-soft">
               {recents.map((r) => (
-                <li key={`${r.repo}@${r.spec}@${r.visitedAt}`}>
+                <li key={`${r.repo}@${r.visitedAt}`}>
                   <button
                     type="button"
                     onClick={() => {
                       form.setFieldValue('repo', r.repo)
-                      form.setFieldValue('spec', r.spec)
-                      navigate({
-                        to: '/compare/$',
-                        params: { _splat: r.spec },
-                        search: { repo: r.repo },
-                      })
+                      goBrowse(r.repo)
                     }}
                     className="w-full text-left px-3 py-2 font-mono text-xs hover:bg-bg-card flex items-center gap-3 cursor-pointer"
                   >
-                    <span className="text-rust">{r.spec}</span>
+                    <Eye size={14} aria-hidden="true" className="text-mute flex-shrink-0" />
                     <span className="text-ink-2 truncate">{r.repo}</span>
                     <span className="ml-auto text-mute text-xs">{timeAgo(r.visitedAt)}</span>
                   </button>
@@ -249,7 +250,10 @@ function HomePage() {
         isOpen={pickerOpen}
         onOpenChange={setPickerOpen}
         initialPath={form.state.values.repo.trim() || null}
-        onPick={(path) => form.setFieldValue('repo', path)}
+        onPick={(path) => {
+          form.setFieldValue('repo', path)
+          goBrowse(path)
+        }}
       />
     </div>
   )
