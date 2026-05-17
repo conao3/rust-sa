@@ -247,7 +247,6 @@ function FileBlock({
   const wrapperStyle: React.CSSProperties = collapsed
     ? {}
     : {
-        minHeight: reservedHeight,
         contentVisibility: 'auto',
         containIntrinsicSize: `auto ${reservedHeight}px`,
       }
@@ -256,7 +255,7 @@ function FileBlock({
     return (
       <div
         className="px-4 py-3 font-mono text-xs text-mute border-b border-hairline-soft"
-        style={wrapperStyle}
+        style={{ minHeight: reservedHeight }}
       >
         {path} — loading…
       </div>
