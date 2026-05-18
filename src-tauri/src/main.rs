@@ -1,6 +1,7 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use tauri::{ipc::Channel, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{ipc::Channel, AppHandle, State, WebviewUrl, WebviewWindowBuilder};
 
 use conao3_sa::server::{
     blob_text, build_schema, diff_text, watcher_for, AppSchema, BackendError,
@@ -59,6 +60,23 @@ async fn subscribe_events(repo: String, channel: Channel<String>) -> Result<(), 
     Ok(())
 }
 
+#[tauri::command]
+async fn open_new_window(app: AppHandle) -> Result<(), String> {
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let label = format!("window-{id}");
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("/".into()))
+        .title("rust-sa")
+        .inner_size(1200.0, 800.0)
+        .resizable(true)
+        .on_document_title_changed(|window, title| {
+            let _ = window.set_title(&title);
+        })
+        .build()
+        .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
 fn backend_error_to_string(err: BackendError) -> String {
     match err {
         BackendError::Internal(msg) => msg,
@@ -87,13 +105,17 @@ fn main() {
             graphql,
             diff,
             blob,
-            subscribe_events
+            subscribe_events,
+            open_new_window
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("/".into()))
                 .title("rust-sa")
                 .inner_size(1200.0, 800.0)
                 .resizable(true)
+                .on_document_title_changed(|window, title| {
+                    let _ = window.set_title(&title);
+                })
                 .build()?;
             Ok(())
         })

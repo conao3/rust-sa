@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { useLocation, useRouter } from '@tanstack/react-router'
 import { isTauri } from '#/lib/apollo'
@@ -9,15 +9,18 @@ export function UrlBar() {
   const inputRef = useRef<HTMLInputElement>(null)
   const current = `${location.pathname}${location.searchStr}${location.hash ? `#${location.hash}` : ''}`
   const [value, setValue] = useState(current)
+  const tauri = isTauri()
 
   // Reflect router-initiated navigations back into the bar.
   useEffect(() => {
     setValue(current)
   }, [current])
 
-  // Cmd+L (Mac) / Ctrl+L (others) focuses the bar like a browser.
-  useHotkeys(
-    [
+  // Browser-style window shortcuts. Only register them inside the tauri
+  // webview so we don't preventDefault on a real browser's Cmd+L / Cmd+N.
+  const hotkeys = useMemo(() => {
+    if (!tauri) return []
+    return [
       {
         hotkey: { key: 'l', mod: true },
         callback: () => {
@@ -27,11 +30,24 @@ export function UrlBar() {
           el.select()
         },
       },
-    ],
-    { preventDefault: true },
-  )
+      {
+        hotkey: { key: 'n', mod: true },
+        callback: () => {
+          void (async () => {
+            const { invoke } = await import('@tauri-apps/api/core')
+            try {
+              await invoke('open_new_window')
+            } catch (err) {
+              console.error('open_new_window failed', err)
+            }
+          })()
+        },
+      },
+    ]
+  }, [tauri])
+  useHotkeys(hotkeys, { preventDefault: true })
 
-  if (!isTauri()) return null
+  if (!tauri) return null
 
   const submit = () => {
     let path = value.trim()

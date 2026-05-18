@@ -1,6 +1,6 @@
 import { ApolloProvider } from '@apollo/client/react'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, useSearch } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { apolloClient } from '../lib/apollo'
 import { UrlBar } from '../components/url-bar'
@@ -39,6 +39,15 @@ export const Route = createRootRoute({
 })
 
 function RootRoute() {
+  const search = useSearch({ strict: false }) as { repo?: unknown }
+  const repo = typeof search.repo === 'string' ? search.repo : undefined
+
+  // Drive document.title from React state; the tauri window watches it via
+  // on_document_title_changed and mirrors it to the OS title bar.
+  useEffect(() => {
+    document.title = repo ? `rust-sa - ${repo}` : 'rust-sa'
+  }, [repo])
+
   return (
     <>
       <UrlBar />
