@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { API_ORIGIN } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/apollo'
 
 export interface DiffState {
   patch: string
@@ -11,7 +11,7 @@ function diffUrl(rev: string, repo: string, path?: string, w?: boolean): string 
   const params = new URLSearchParams({ rev, repo })
   if (path) params.set('path', path)
   if (w) params.set('w', '1')
-  return `${API_ORIGIN}/api/diff?${params.toString()}`
+  return `${getApiOrigin()}/api/diff?${params.toString()}`
 }
 
 export function useDiff(

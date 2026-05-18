@@ -1,10 +1,10 @@
-import { API_ORIGIN } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/apollo'
 
 const cache = new Map<string, Promise<string>>()
 
 function blobUrl(rev: string, repo: string, path: string): string {
   const params = new URLSearchParams({ rev, repo, path })
-  return `${API_ORIGIN}/api/blob?${params.toString()}`
+  return `${getApiOrigin()}/api/blob?${params.toString()}`
 }
 
 export function fetchBlob(rev: string, repo: string, path: string): Promise<string> {

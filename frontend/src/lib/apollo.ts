@@ -5,13 +5,16 @@ declare global {
   var __SA_API_ORIGIN__: string | undefined
 }
 
-export const API_ORIGIN: string =
-  (typeof globalThis !== 'undefined' && globalThis.__SA_API_ORIGIN__) ||
-  'https://sa-api.localhost'
+export function getApiOrigin(): string {
+  return (
+    (typeof globalThis !== 'undefined' && globalThis.__SA_API_ORIGIN__) ||
+    'https://sa-api.localhost'
+  )
+}
 
 export const apolloClient = new ApolloClient({
   link: new HttpLink({
-    uri: `${API_ORIGIN}/api/graphql`,
+    uri: () => `${getApiOrigin()}/api/graphql`,
   }),
   cache: new InMemoryCache(),
   devtools: {

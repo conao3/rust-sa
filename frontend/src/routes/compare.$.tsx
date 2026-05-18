@@ -8,7 +8,7 @@ import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
 import { ResizeHandle } from '#/components/ui/resize-handle'
 import { TopBar, type Mode, type View } from '#/components/top-bar'
-import { API_ORIGIN } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { shortSha } from '#/lib/short-sha'
 import { useComments } from '#/lib/comments'
@@ -91,8 +91,8 @@ export const Route = createFileRoute('/compare/$')({
     if (!repo) {
       throw new Error('?repo=<absolute-path> query parameter is required')
     }
-    const { SERVER_ORIGIN } = await import('#/lib/server-origin')
-    const res = await fetch(`${SERVER_ORIGIN}/api/graphql`, {
+    const { getServerOrigin } = await import('#/lib/server-origin')
+    const res = await fetch(`${getServerOrigin()}/api/graphql`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -143,7 +143,7 @@ function ComparePage() {
   const liveFiles = refreshKey === 0 ? files : (data?.files ?? files)
   const [livePulse, setLivePulse] = useState(false)
   useSSE(
-    `${API_ORIGIN}/api/events?repo=${encodeURIComponent(repo)}`,
+    `${getApiOrigin()}/api/events?repo=${encodeURIComponent(repo)}`,
     async () => {
       const result = await refetch()
       const next = result.data?.files ?? []
