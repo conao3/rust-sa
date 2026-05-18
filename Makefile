@@ -6,6 +6,10 @@ dev:
 dev-frontend:
 	$(MAKE) -C frontend dev
 
+.PHONY: dev-tauri
+dev-tauri:
+	$(MAKE) -C src-tauri dev-tauri
+
 .PHONY: build
 build:
 	$(MAKE) -C src-tauri build
