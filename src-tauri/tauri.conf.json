@@ -7,7 +7,7 @@
     "frontendDist": "dist",
     "devUrl": "https://sa.localhost",
     "beforeDevCommand": "make -C frontend dev",
-    "beforeBuildCommand": "make -C frontend build && rm -rf src-tauri/dist && cp -r frontend/.output/public src-tauri/dist"
+    "beforeBuildCommand": "make -C ../frontend build && rm -rf dist && cp -r ../frontend/.output/public dist"
   },
   "app": {
     "windows": [],
