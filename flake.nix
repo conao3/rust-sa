@@ -22,7 +22,7 @@
       ];
 
       perSystem =
-        { system, ... }:
+        { self', system, ... }:
         let
           overlay =
             final: prev:
@@ -53,6 +53,11 @@
             ];
           };
 
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = rustToolchain;
+            rustc = rustToolchain;
+          };
+
           gstPlugins = with pkgs.gst_all_1; [
             gstreamer
             gst-plugins-base
@@ -81,6 +86,77 @@
             )
             ++ lib.optionals stdenv.isDarwin [ ];
 
+          conao3-sa = rustPlatform.buildRustPackage (finalAttrs: {
+            pname = "conao3-sa";
+            version = "0.1.4";
+
+            src = pkgs.lib.cleanSource ./.;
+
+            cargoRoot = "src-tauri";
+            buildAndTestSubdir = finalAttrs.cargoRoot;
+            cargoLock.lockFile = ./src-tauri/Cargo.lock;
+
+            postPatch = ''
+              substituteInPlace src-tauri/tauri.conf.json \
+                --replace-fail \
+                  'make -C ../frontend build && rm -rf dist && cp -r ../frontend/.output/public dist' \
+                  'make -C frontend build && rm -rf src-tauri/dist && cp -r frontend/.output/public src-tauri/dist'
+            '';
+
+            pnpmRoot = "frontend";
+            pnpmDeps = pkgs.fetchPnpmDeps {
+              inherit (finalAttrs)
+                pname
+                version
+                src
+                ;
+              pnpm = pkgs.pnpm;
+              postPatch = "cd ${finalAttrs.pnpmRoot}";
+              fetcherVersion = 3;
+              hash = "sha256-f+zk+I3UWP1kbmA1p9ZW1woigdi+UBTc08UtH91eptU=";
+            };
+
+            nativeBuildInputs =
+              with pkgs;
+              [
+                cargo-tauri.hook
+                makeWrapper
+                nodejs
+                pnpm
+                pnpmConfigHook
+              ]
+              ++ lib.optionals stdenv.isLinux [
+                pkg-config
+                wrapGAppsHook3
+              ];
+
+            buildInputs = tauriBuildInputs;
+
+            postInstall = ''
+              mkdir -p "$out/bin"
+              candidate="$(find "$out" -type f -perm -111 \
+                \( -path '*/Contents/MacOS/*' -o -path '*/bin/*' \) \
+                ! -name '*.wrapped' \
+                | head -n 1)"
+              if [ -z "$candidate" ]; then
+                echo "could not find installed sa executable" >&2
+                exit 1
+              fi
+              makeWrapper "$candidate" "$out/bin/sa" \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git ]}
+            '';
+
+            passthru.pnpmDeps = finalAttrs.pnpmDeps;
+
+            meta = {
+              description = "Local git diff reviewer with a TanStack Start frontend and an axum/async-graphql backend";
+              homepage = "https://github.com/conao3/rust-sa";
+              license = pkgs.lib.licenses.mit;
+              mainProgram = "sa";
+              platforms = pkgs.lib.platforms.linux ++ pkgs.lib.platforms.darwin;
+            };
+          });
+
           branchSlug = pkgs.writeShellScript "branch-slug" ''
             set -euo pipefail -o posix
             BRANCH=$(${pkgs.git}/bin/git rev-parse --abbrev-ref HEAD)
@@ -92,6 +168,14 @@
           '';
         in
         {
+          packages.default = conao3-sa;
+          packages.pnpmDeps = conao3-sa.passthru.pnpmDeps;
+
+          apps.default = {
+            type = "app";
+            program = "${self'.packages.default}/bin/sa";
+          };
+
           treefmt = {
             projectRootFile = "flake.nix";
             programs.rustfmt.enable = true;
@@ -100,15 +184,17 @@
           };
 
           devShells.default = pkgs.mkShell {
-            packages = with pkgs; [
-              rustToolchain
-              cargo-watch
-              nodejs
-              pnpm
-              cargo-tauri
-              tmux
-            ]
-            ++ tauriBuildInputs;
+            packages =
+              with pkgs;
+              [
+                rustToolchain
+                cargo-watch
+                nodejs
+                pnpm
+                cargo-tauri
+                tmux
+              ]
+              ++ tauriBuildInputs;
 
             shellHook = ''
               export RUST_LOG=info
