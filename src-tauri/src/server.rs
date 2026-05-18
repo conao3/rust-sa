@@ -101,7 +101,7 @@ fn save_preferences(prefs: &Preferences) -> std::io::Result<()> {
     std::fs::write(path, body)
 }
 
-struct Query;
+pub struct Query;
 
 #[Object]
 impl Query {
@@ -354,7 +354,7 @@ async fn run_for_each_ref(repo: &str, patterns: &[&str]) -> async_graphql::Resul
     Ok(refs)
 }
 
-struct Mutation;
+pub struct Mutation;
 
 #[Object]
 impl Mutation {
@@ -372,7 +372,11 @@ impl Mutation {
     }
 }
 
-type AppSchema = Schema<Query, Mutation, EmptySubscription>;
+pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
+
+pub fn build_schema() -> AppSchema {
+    Schema::build(Query, Mutation, EmptySubscription).finish()
+}
 
 async fn graphql_handler(schema: Extension<AppSchema>, req: GraphQLRequest) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
@@ -467,68 +471,85 @@ fn normalize_renamed_path(raw: &str) -> String {
 }
 
 
-async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
-    let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
-    let ignore_ws = matches!(params.w.as_deref(), Some("1") | Some("true"));
-    let (subcmd, extra) = diff_extras_for_rev(&rev, ignore_ws);
+pub enum BackendError {
+    Internal(String),
+    BadRequest(String),
+    NotFound(String),
+}
+
+pub async fn diff_text(
+    rev: &str,
+    repo: &str,
+    path: Option<&str>,
+    ignore_ws: bool,
+) -> Result<Vec<u8>, BackendError> {
+    let (subcmd, extra) = diff_extras_for_rev(rev, ignore_ws);
     let mut args: Vec<String> = vec![subcmd.into(), "--no-color".into()];
     args.extend(extra);
-    if let Some(p) = params.path.as_ref() {
+    if let Some(p) = path {
         args.push("--".into());
-        args.push(p.clone());
+        args.push(p.to_string());
     }
-    let output = match tokio::process::Command::new("git")
-        .current_dir(PathBuf::from(&params.repo))
+    let output = tokio::process::Command::new("git")
+        .current_dir(PathBuf::from(repo))
         .args(&args)
         .output()
         .await
-    {
-        Ok(o) => o,
-        Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("git failed: {e}")).into_response()
-        }
-    };
+        .map_err(|e| BackendError::Internal(format!("git failed: {e}")))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return (
-            StatusCode::BAD_REQUEST,
-            format!("git {rev}: {stderr}"),
-        )
-            .into_response();
+        return Err(BackendError::BadRequest(format!("git {rev}: {stderr}")));
     }
-    (
-        [(header::CONTENT_TYPE, "text/x-diff; charset=utf-8")],
-        output.stdout,
-    )
-        .into_response()
+    Ok(output.stdout)
 }
 
-async fn blob_handler(AxumQuery(params): AxumQuery<BlobParams>) -> Response {
-    let target = format!("{}:{}", params.rev, params.path);
-    let output = match tokio::process::Command::new("git")
-        .current_dir(PathBuf::from(&params.repo))
+pub async fn blob_text(rev: &str, repo: &str, path: &str) -> Result<Vec<u8>, BackendError> {
+    let target = format!("{rev}:{path}");
+    let output = tokio::process::Command::new("git")
+        .current_dir(PathBuf::from(repo))
         .args(["show", &target])
         .output()
         .await
-    {
-        Ok(o) => o,
-        Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("git failed: {e}")).into_response()
-        }
-    };
+        .map_err(|e| BackendError::Internal(format!("git failed: {e}")))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return (
-            StatusCode::NOT_FOUND,
-            format!("git show {target}: {stderr}"),
-        )
-            .into_response();
+        return Err(BackendError::NotFound(format!(
+            "git show {target}: {stderr}"
+        )));
     }
-    (
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-        output.stdout,
-    )
-        .into_response()
+    Ok(output.stdout)
+}
+
+pub fn watcher_for(repo: PathBuf) -> broadcast::Sender<String> {
+    ensure_watcher(repo)
+}
+
+async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
+    let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
+    let ignore_ws = matches!(params.w.as_deref(), Some("1") | Some("true"));
+    match diff_text(&rev, &params.repo, params.path.as_deref(), ignore_ws).await {
+        Ok(out) => (
+            [(header::CONTENT_TYPE, "text/x-diff; charset=utf-8")],
+            out,
+        )
+            .into_response(),
+        Err(BackendError::Internal(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Err(BackendError::BadRequest(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
+        Err(BackendError::NotFound(msg)) => (StatusCode::NOT_FOUND, msg).into_response(),
+    }
+}
+
+async fn blob_handler(AxumQuery(params): AxumQuery<BlobParams>) -> Response {
+    match blob_text(&params.rev, &params.repo, &params.path).await {
+        Ok(out) => (
+            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            out,
+        )
+            .into_response(),
+        Err(BackendError::Internal(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Err(BackendError::BadRequest(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
+        Err(BackendError::NotFound(msg)) => (StatusCode::NOT_FOUND, msg).into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -704,7 +725,7 @@ pub async fn run_with_port_callback<F>(on_bound: F) -> Result<(), Box<dyn std::e
 where
     F: FnOnce(u16),
 {
-    let schema = Schema::build(Query, Mutation, EmptySubscription).finish();
+    let schema = build_schema();
     let app = build_router(schema);
     let port: u16 = std::env::var("PORT")
         .ok()

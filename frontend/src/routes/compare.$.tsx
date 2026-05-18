@@ -8,13 +8,12 @@ import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
 import { ResizeHandle } from '#/components/ui/resize-handle'
 import { TopBar, type Mode, type View } from '#/components/top-bar'
-import { getApiOrigin } from '#/lib/apollo'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { shortSha } from '#/lib/short-sha'
 import { useComments } from '#/lib/comments'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
-import { useSSE } from '#/lib/sse'
+import { useEvents } from '#/lib/sse'
 import { useViewed } from '#/lib/viewed'
 
 import type { GitStatusEntry } from '@pierre/trees'
@@ -142,8 +141,8 @@ function ComparePage() {
   })
   const liveFiles = refreshKey === 0 ? files : (data?.files ?? files)
   const [livePulse, setLivePulse] = useState(false)
-  useSSE(
-    `${getApiOrigin()}/api/events?repo=${encodeURIComponent(repo)}`,
+  useEvents(
+    repo,
     async () => {
       const result = await refetch()
       const next = result.data?.files ?? []

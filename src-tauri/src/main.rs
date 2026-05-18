@@ -1,6 +1,71 @@
-use std::sync::mpsc;
+use std::path::PathBuf;
 
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{ipc::Channel, State, WebviewUrl, WebviewWindowBuilder};
+
+use conao3_sa::server::{
+    blob_text, build_schema, diff_text, watcher_for, AppSchema, BackendError,
+};
+
+#[tauri::command]
+async fn graphql(
+    schema: State<'_, AppSchema>,
+    query: String,
+    variables: Option<serde_json::Value>,
+    operation_name: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let mut request = async_graphql::Request::new(query);
+    if let Some(vars) = variables {
+        request = request.variables(async_graphql::Variables::from_json(vars));
+    }
+    if let Some(name) = operation_name {
+        request = request.operation_name(name);
+    }
+    let response = schema.execute(request).await;
+    serde_json::to_value(response).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+async fn diff(
+    rev: String,
+    repo: String,
+    path: Option<String>,
+    w: Option<bool>,
+) -> Result<String, String> {
+    let bytes = diff_text(&rev, &repo, path.as_deref(), w.unwrap_or(false))
+        .await
+        .map_err(backend_error_to_string)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+#[tauri::command]
+async fn blob(rev: String, repo: String, path: String) -> Result<String, String> {
+    let bytes = blob_text(&rev, &repo, &path)
+        .await
+        .map_err(backend_error_to_string)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+#[tauri::command]
+async fn subscribe_events(repo: String, channel: Channel<String>) -> Result<(), String> {
+    let tx = watcher_for(PathBuf::from(&repo));
+    let mut rx = tx.subscribe();
+    tauri::async_runtime::spawn(async move {
+        while let Ok(payload) = rx.recv().await {
+            if channel.send(payload).is_err() {
+                break;
+            }
+        }
+    });
+    Ok(())
+}
+
+fn backend_error_to_string(err: BackendError) -> String {
+    match err {
+        BackendError::Internal(msg) => msg,
+        BackendError::BadRequest(msg) => msg,
+        BackendError::NotFound(msg) => msg,
+    }
+}
 
 fn main() {
     if std::env::args().any(|a| a == "--serve") {
@@ -15,37 +80,20 @@ fn main() {
         return;
     }
 
-    let (port_tx, port_rx) = mpsc::channel::<u16>();
-    std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("failed to start backend tokio runtime");
-        let send_port = move |port| {
-            let _ = port_tx.send(port);
-        };
-        if let Err(err) = runtime.block_on(conao3_sa::server::run_with_port_callback(send_port)) {
-            eprintln!("backend exited: {err}");
-        }
-    });
-
-    let port = port_rx
-        .recv()
-        .expect("backend never reported its bound port");
-    let api_origin = format!("http://127.0.0.1:{port}");
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .setup(move |app| {
-            let script = format!(
-                "globalThis.__SA_API_ORIGIN__ = {};",
-                serde_json::to_string(&api_origin)?
-            );
+        .manage(build_schema())
+        .invoke_handler(tauri::generate_handler![
+            graphql,
+            diff,
+            blob,
+            subscribe_events
+        ])
+        .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("/".into()))
                 .title("rust-sa")
                 .inner_size(1200.0, 800.0)
                 .resizable(true)
-                .initialization_script(&script)
                 .build()?;
             Ok(())
         })

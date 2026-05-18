@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getApiOrigin } from '#/lib/apollo'
+import { getApiOrigin, isTauri } from '#/lib/apollo'
 
 export interface DiffState {
   patch: string
@@ -7,11 +7,28 @@ export interface DiffState {
   error: Error | null
 }
 
-function diffUrl(rev: string, repo: string, path?: string, w?: boolean): string {
+async function fetchDiff(
+  rev: string,
+  repo: string,
+  path?: string,
+  w?: boolean,
+): Promise<string> {
+  if (isTauri()) {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return invoke<string>('diff', {
+      rev,
+      repo,
+      path: path ?? null,
+      w: w ?? false,
+    })
+  }
   const params = new URLSearchParams({ rev, repo })
   if (path) params.set('path', path)
   if (w) params.set('w', '1')
-  return `${getApiOrigin()}/api/diff?${params.toString()}`
+  const url = `${getApiOrigin()}/api/diff?${params.toString()}`
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
+  return r.text()
 }
 
 export function useDiff(
@@ -36,11 +53,7 @@ export function useDiff(
     }
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
-    fetch(diffUrl(rev, repo, path, w))
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
-        return r.text()
-      })
+    fetchDiff(rev, repo, path, w)
       .then((text) => {
         if (cancelled) return
         setState({ patch: text, loading: false, error: null })
