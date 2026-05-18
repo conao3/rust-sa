@@ -697,6 +697,13 @@ fn spawn_watcher(
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    run_with_port_callback(|_| {}).await
+}
+
+pub async fn run_with_port_callback<F>(on_bound: F) -> Result<(), Box<dyn std::error::Error>>
+where
+    F: FnOnce(u16),
+{
     let schema = Schema::build(Query, Mutation, EmptySubscription).finish();
     let app = build_router(schema);
     let port: u16 = std::env::var("PORT")
@@ -706,6 +713,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     let listener = TcpListener::bind(addr).await?;
     let bound = listener.local_addr()?;
+    on_bound(bound.port());
     if let Ok(portless_url) = std::env::var("PORTLESS_URL") {
         println!("graphql at  {portless_url}/api/graphql");
         println!("diff text   {portless_url}/api/diff?rev=HEAD");

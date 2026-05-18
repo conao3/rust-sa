@@ -9,15 +9,7 @@
     "beforeBuildCommand": "make -C frontend build && rm -rf src-tauri/dist && cp -r frontend/.output/public src-tauri/dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "rust-sa",
-        "width": 1200,
-        "height": 800,
-        "resizable": true,
-        "url": "/"
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
