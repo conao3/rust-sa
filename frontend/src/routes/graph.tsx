@@ -47,11 +47,17 @@ function gitStatusKey(s: string): GitStatusEntry['status'] {
 
 interface GraphSearch {
   repo?: string
+  base?: string
+  head?: string
+  dot?: '2' | '3'
 }
 
 export const Route = createFileRoute('/graph')({
   validateSearch: (search: Record<string, unknown>): GraphSearch => ({
     repo: typeof search.repo === 'string' ? search.repo : undefined,
+    base: typeof search.base === 'string' && search.base ? search.base : undefined,
+    head: typeof search.head === 'string' && search.head ? search.head : undefined,
+    dot: search.dot === '2' ? '2' : search.dot === '3' ? '3' : undefined,
   }),
   loaderDeps: ({ search }) => ({ repo: search.repo }),
   loader: ({ deps }) => {
@@ -126,18 +132,32 @@ const REFS_QUERY = gql`
 
 function GraphPage() {
   const navigate = useNavigate()
+  const search = Route.useSearch()
   const [mode, setMode] = usePreference<Mode>('rust-sa:mode', 'unified')
   const [theme] = useThemePreference()
   const [density] = usePreference<'compact' | 'regular' | 'comfy'>('rust-sa:density', 'regular')
   const [commitsWStr, setCommitsWStr] = usePreference<string>('rust-sa:graph-commits-w', '420')
   const commitsW = Number(commitsWStr) || 420
   const [helpOpen, setHelpOpen] = useState(false)
-  const [base, setBase] = useState<string | null>(null)
-  const [head, setHead] = useState<string | null>(null)
-  const [threeDot, setThreeDot] = useState(true)
+  const [base, setBase] = useState<string | null>(search.base ?? null)
+  const [head, setHead] = useState<string | null>(search.head ?? null)
+  const [threeDot, setThreeDot] = useState(search.dot !== '2')
 
   useRootAttribute('data-theme', theme)
   useRootAttribute('data-density', density)
+
+  useEffect(() => {
+    navigate({
+      to: '/graph',
+      search: (prev) => ({
+        ...prev,
+        base: base ?? undefined,
+        head: head ?? undefined,
+        dot: threeDot ? undefined : '2',
+      }),
+      replace: true,
+    })
+  }, [base, head, threeDot, navigate])
 
   const { repo } = Route.useLoaderData()
   const { data, loading, error, fetchMore } = useQuery<{ commits: Commit[] }>(COMMITS_QUERY, {
