@@ -160,9 +160,9 @@ impl Query {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
         let (subcmd, extra) = diff_extras_for_rev(&rev, w.unwrap_or(false));
 
-        let mut numstat_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--numstat".into()];
+        let mut numstat_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--numstat".into()];
         numstat_args.extend(extra.clone());
-        let mut status_args: Vec<String> = vec![subcmd.into(), "--no-color".into(), "--name-status".into()];
+        let mut status_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--name-status".into()];
         status_args.extend(extra);
 
         let cwd = PathBuf::from(&repo);
@@ -484,7 +484,7 @@ pub async fn diff_text(
     ignore_ws: bool,
 ) -> Result<Vec<u8>, BackendError> {
     let (subcmd, extra) = diff_extras_for_rev(rev, ignore_ws);
-    let mut args: Vec<String> = vec![subcmd.into(), "--no-color".into()];
+    let mut args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into()];
     args.extend(extra);
     if let Some(p) = path {
         args.push("--".into());
