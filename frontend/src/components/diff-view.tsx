@@ -1,11 +1,12 @@
-import { PatchDiff } from '@pierre/diffs/react'
+import { processFile, type FileDiffMetadata } from '@pierre/diffs'
+import { FileDiff, PatchDiff } from '@pierre/diffs/react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { CommentComposer } from '#/components/comment-composer'
 import { CommentThread } from '#/components/comment-thread'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import type { Comment, Side } from '#/lib/comments'
-import { useDiff } from '#/lib/diff-api'
+import { useDiff, useFileBlobs } from '#/lib/diff-api'
 
 type PatchDiffProps = ComponentProps<typeof PatchDiff>
 type RenderCustomHeader = PatchDiffProps['renderCustomHeader']
@@ -138,6 +139,19 @@ function FileBlock({
     initialPatch,
     ignoreWhitespace,
   )
+  const blobs = useFileBlobs(rev, repo, path, refreshKey)
+  const fileDiff = useMemo<FileDiffMetadata | undefined>(() => {
+    if (!patch || !blobs.available || blobs.error) return undefined
+    try {
+      return processFile(patch, {
+        isGitDiff: true,
+        oldFile: { name: path, contents: blobs.oldText ?? '' },
+        newFile: { name: path, contents: blobs.newText ?? '' },
+      })
+    } catch {
+      return undefined
+    }
+  }, [patch, blobs.available, blobs.error, blobs.oldText, blobs.newText, path])
   const reservedHeight = Math.max(240, (additions + deletions + 30) * 22)
   const [composing, setComposing] = useState<ComposingState | null>(null)
   const [composerBody, setComposerBody] = useState('')
@@ -204,6 +218,8 @@ function FileBlock({
     theme: theme === 'dark' ? 'github-dark' : 'github-light',
     enableGutterUtility: true,
     enableLineSelection: true,
+    hunkSeparators: 'line-info',
+    expandUnchanged: false,
     onGutterUtilityClick,
     onLineSelectionStart: setSelectedLines,
     onLineSelectionChange: setSelectedLines,
@@ -326,16 +342,26 @@ function FileBlock({
           </span>
         )}
       </div>
-      {!collapsed && (
-        <PatchDiff
-          patch={patch}
-          options={options}
-          lineAnnotations={annotations}
-          selectedLines={selectedLines}
-          renderCustomHeader={hideDefaultHeader}
-          renderAnnotation={renderAnnotation}
-        />
-      )}
+      {!collapsed &&
+        (fileDiff ? (
+          <FileDiff
+            fileDiff={fileDiff}
+            options={options}
+            lineAnnotations={annotations}
+            selectedLines={selectedLines}
+            renderCustomHeader={hideDefaultHeader}
+            renderAnnotation={renderAnnotation}
+          />
+        ) : (
+          <PatchDiff
+            patch={patch}
+            options={options}
+            lineAnnotations={annotations}
+            selectedLines={selectedLines}
+            renderCustomHeader={hideDefaultHeader}
+            renderAnnotation={renderAnnotation}
+          />
+        ))}
     </div>
   )
 }
