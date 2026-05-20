@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { GraphNode } from '#/lib/git-graph'
 import { laneColor } from '#/lib/git-graph'
 
@@ -12,7 +13,7 @@ interface GraphColumnProps {
 const LANE_W_DEFAULT = 14
 const DOT_R = 4
 
-export function GraphColumn({
+export const GraphColumn = memo(function GraphColumn({
   node,
   nextNode,
   rowHeight,
@@ -72,4 +73,4 @@ export function GraphColumn({
       <circle cx={cx(node.lane)} cy={mid} r={DOT_R} fill={node.color} />
     </svg>
   )
-}
+})

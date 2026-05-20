@@ -11,7 +11,7 @@ import {
   Split,
   Tag as TagIcon,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { HelpSheet } from '#/components/help-sheet'
 import { TopBar, type Mode, type Theme, type View } from '#/components/top-bar'
 import { Button } from '#/components/ui/button'
@@ -164,12 +164,12 @@ function GraphPage() {
     variables: { limit: PAGE_SIZE, skip: 0, repo },
     notifyOnNetworkStatusChange: true,
   })
-  const commits = data?.commits ?? []
+  const commits = useMemo(() => data?.commits ?? [], [data?.commits])
   const { data: refsData } = useQuery<{ branches: GitRef[]; tags: GitRef[] }>(REFS_QUERY, {
     variables: { repo },
   })
-  const branches = refsData?.branches ?? []
-  const tags = refsData?.tags ?? []
+  const branches = useMemo(() => refsData?.branches ?? [], [refsData?.branches])
+  const tags = useMemo(() => refsData?.tags ?? [], [refsData?.tags])
   const [loadingMore, setLoadingMore] = useState(false)
   const [exhausted, setExhausted] = useState(false)
 
@@ -212,27 +212,30 @@ function GraphPage() {
     return false
   }
 
-  const onRowClick = (e: MouseEvent, sha: string) => {
+  const onRowClick = useCallback((e: MouseEvent, sha: string) => {
     if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(sha)
     else setBase(sha)
-  }
+  }, [])
 
-  const onSpecialClick = (e: MouseEvent, id: SpecialId) => {
+  const onSpecialClick = useCallback((e: MouseEvent, id: SpecialId) => {
     if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(id)
     else setBase(id)
-  }
+  }, [])
 
-  const onRefClick = (e: MouseEvent, name: string) => {
+  const onRefClick = useCallback((e: MouseEvent, name: string) => {
     if (consumeDragFlag()) return
     if (e.ctrlKey || e.metaKey) setHead(name)
     else setBase(name)
-  }
+  }, [])
 
-  const openSpecDiff = (spec: string) => {
-    navigate({ to: '/compare/$', params: { _splat: shortenSpec(spec) }, search: { repo } })
-  }
+  const openSpecDiff = useCallback(
+    (spec: string) => {
+      navigate({ to: '/compare/$', params: { _splat: shortenSpec(spec) }, search: { repo } })
+    },
+    [navigate, repo],
+  )
 
   const onPaneDown = (e: MouseEvent) => {
     if (e.button !== 0) return
@@ -267,7 +270,7 @@ function GraphPage() {
       navigate({ to: '/compare/$', params: { _splat: 'HEAD' }, search: { repo } })
   }
 
-  const previewSpec = (() => {
+  const previewSpec = useMemo(() => {
     if (!base) return null
     if (!head) return base
     // `git diff A...B` resolves to `merge_base(A, B)..B`, which collapses to
@@ -282,16 +285,16 @@ function GraphPage() {
       }
     }
     return `${base}${threeDot ? '...' : '..'}${head}`
-  })()
+  }, [base, head, threeDot, anySpecial, commits])
 
-  const rangeShas = (() => {
+  const rangeShas = useMemo(() => {
     if (!base || !head || anySpecial) return null as Set<string> | null
     const i = commits.findIndex((c) => c.sha === base)
     const j = commits.findIndex((c) => c.sha === head)
     if (i < 0 || j < 0) return null
     const [lo, hi] = i < j ? [i, j] : [j, i]
     return new Set(commits.slice(lo + 1, hi).map((c) => c.sha))
-  })()
+  }, [base, head, anySpecial, commits])
 
   const openDiff = () => {
     if (!previewSpec) return
@@ -608,11 +611,20 @@ function CommitList({
   onRowClick: (e: MouseEvent, sha: string) => void
   onRowDoubleClick: (sha: string) => void
 }) {
-  const nodes = layoutGraph(commits)
-  const totalLanes = nodes.reduce(
-    (max, n) =>
-      Math.max(max, n.lane + 1, ...n.parentLanes.map((p) => p + 1), ...n.passing.map((p) => p + 1)),
-    1,
+  const nodes = useMemo(() => layoutGraph(commits), [commits])
+  const totalLanes = useMemo(
+    () =>
+      nodes.reduce(
+        (max, n) =>
+          Math.max(
+            max,
+            n.lane + 1,
+            ...n.parentLanes.map((p) => p + 1),
+            ...n.passing.map((p) => p + 1),
+          ),
+        1,
+      ),
+    [nodes],
   )
   return (
     <>
@@ -626,15 +638,15 @@ function CommitList({
           isBase={base === c.sha}
           isHead={head === c.sha}
           isInRange={rangeShas?.has(c.sha) ?? false}
-          onClick={(e) => onRowClick(e, c.sha)}
-          onDoubleClick={() => onRowDoubleClick(c.sha)}
+          onSelect={onRowClick}
+          onActivate={onRowDoubleClick}
         />
       ))}
     </>
   )
 }
 
-function CommitRow({
+const CommitRow = memo(function CommitRow({
   commit,
   node,
   nextNode,
@@ -642,8 +654,8 @@ function CommitRow({
   isBase,
   isHead,
   isInRange,
-  onClick,
-  onDoubleClick,
+  onSelect,
+  onActivate,
 }: {
   commit: Commit
   node: GraphNode
@@ -652,16 +664,20 @@ function CommitRow({
   isBase: boolean
   isHead: boolean
   isInRange: boolean
-  onClick: (e: MouseEvent) => void
-  onDoubleClick: () => void
+  onSelect: (e: MouseEvent, sha: string) => void
+  onActivate: (sha: string) => void
 }) {
   return (
     <button
       type="button"
       data-spec={commit.sha}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      style={{ height: ROW_HEIGHT }}
+      onClick={(e) => onSelect(e, commit.sha)}
+      onDoubleClick={() => onActivate(commit.sha)}
+      style={{
+        height: ROW_HEIGHT,
+        contentVisibility: 'auto',
+        containIntrinsicSize: `auto ${ROW_HEIGHT}px`,
+      }}
       className={clsx(
         'w-full text-left flex items-center gap-2 pr-3 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
         isBase && 'bg-rust-soft',
@@ -678,7 +694,7 @@ function CommitRow({
       <span className="text-mute text-xs flex-shrink-0">{commit.when}</span>
     </button>
   )
-}
+})
 
 function RefBadges({ refs, isBase, isHead }: { refs: string; isBase: boolean; isHead: boolean }) {
   const parts = refs
