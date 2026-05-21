@@ -193,17 +193,8 @@ function FileBlock({
 
   useEffect(() => {
     const el = containerRef.current
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (!entry) return
-        setInRange(entry.isIntersecting)
-      },
-      { rootMargin: `${VIRTUAL_MARGIN_PX}px 0px` },
-    )
-    obs.observe(el)
-    return () => obs.disconnect()
+    if (!el) return
+    return observeVirtualisation(el, setInRange)
   }, [])
 
   // Remember the rendered height so that when we unmount the content the
@@ -211,14 +202,10 @@ function FileBlock({
   useEffect(() => {
     if (!inRange) return
     const el = containerRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(([entry]) => {
-      if (!entry) return
-      const h = entry.contentRect.height
-      if (h > 0) setStableHeight((prev) => (prev != null && prev > h ? prev : h))
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
+    if (!el) return
+    return observeRenderedHeight(el, (h) =>
+      setStableHeight((prev) => (prev != null && prev > h ? prev : h)),
+    )
   }, [inRange])
 
   useEffect(() => {
@@ -445,6 +432,59 @@ const FILE_HEADER_HEIGHT = 40
 // inside the warm zone, small enough that hundreds-of-files commits don't
 // drag every diff into memory at once.
 const VIRTUAL_MARGIN_PX = 5000
+
+// Single IntersectionObserver shared across every FileBlock — we used to
+// allocate one per file which scales linearly in observer count. A shared
+// observer with N targets does the same amount of work as N observers with
+// 1 target, but with one shared callback queue and one set of options.
+type VirtualisationCallback = (inRange: boolean) => void
+const virtualisationCallbacks = new WeakMap<Element, VirtualisationCallback>()
+let virtualisationObserver: IntersectionObserver | null = null
+
+function observeVirtualisation(el: Element, cb: VirtualisationCallback): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    cb(true)
+    return () => {}
+  }
+  if (virtualisationObserver == null) {
+    virtualisationObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          virtualisationCallbacks.get(entry.target)?.(entry.isIntersecting)
+        }
+      },
+      { rootMargin: `${VIRTUAL_MARGIN_PX}px 0px` },
+    )
+  }
+  virtualisationCallbacks.set(el, cb)
+  virtualisationObserver.observe(el)
+  return () => {
+    virtualisationCallbacks.delete(el)
+    virtualisationObserver?.unobserve(el)
+  }
+}
+
+type HeightCallback = (height: number) => void
+const heightCallbacks = new WeakMap<Element, HeightCallback>()
+let heightObserver: ResizeObserver | null = null
+
+function observeRenderedHeight(el: Element, cb: HeightCallback): () => void {
+  if (typeof ResizeObserver === 'undefined') return () => {}
+  if (heightObserver == null) {
+    heightObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.contentRect.height
+        if (h > 0) heightCallbacks.get(entry.target)?.(h)
+      }
+    })
+  }
+  heightCallbacks.set(el, cb)
+  heightObserver.observe(el)
+  return () => {
+    heightCallbacks.delete(el)
+    heightObserver?.unobserve(el)
+  }
+}
 
 let diffsScrollbarSheetCache: CSSStyleSheet | null = null
 function getDiffsScrollbarSheet(): CSSStyleSheet | null {
