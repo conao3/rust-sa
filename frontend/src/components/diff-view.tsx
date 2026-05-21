@@ -296,7 +296,6 @@ function FileBlock({
     : {
         contentVisibility: 'auto',
         containIntrinsicSize: `auto ${reservedHeight}px`,
-        minHeight: reservedHeight,
       }
 
   if (loading && !patch) {
