@@ -48,6 +48,7 @@ import {
   type SpecialId,
 } from '#/components/graph-special'
 import { layoutGraph, type GraphNode } from '#/lib/git-graph'
+import { observeInView } from '#/lib/observer-pool'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
 import { shortenSpec, shortSha } from '#/lib/short-sha'
@@ -634,6 +635,8 @@ function CommitList({
   )
 }
 
+const COMMIT_VIEWPORT_MARGIN: IntersectionObserverInit = { rootMargin: '1500px 0px' }
+
 const CommitRow = memo(function CommitRow({
   commit,
   node,
@@ -655,17 +658,36 @@ const CommitRow = memo(function CommitRow({
   onSelect: (e: MouseEvent, sha: string) => void
   onActivate: (sha: string) => void
 }) {
+  // Virtualise: rows outside ~3 viewport-heights collapse to a placeholder
+  // div of the same height so the SVG graph column + ref badges + per-row
+  // listeners are released. Callback ref keeps the IntersectionObserver
+  // attached when the rendered element type flips between button and div.
+  const [inRange, setInRange] = useState(true)
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!el) return
+    return observeInView(el, COMMIT_VIEWPORT_MARGIN, setInRange)
+  }, [el])
+
+  if (!inRange) {
+    return (
+      <div
+        ref={setEl}
+        data-spec={commit.sha}
+        aria-hidden="true"
+        style={{ height: ROW_HEIGHT }}
+        className="border-b border-hairline-soft"
+      />
+    )
+  }
   return (
     <button
+      ref={setEl}
       type="button"
       data-spec={commit.sha}
       onClick={(e) => onSelect(e, commit.sha)}
       onDoubleClick={() => onActivate(commit.sha)}
-      style={{
-        height: ROW_HEIGHT,
-        contentVisibility: 'auto',
-        containIntrinsicSize: `auto ${ROW_HEIGHT}px`,
-      }}
+      style={{ height: ROW_HEIGHT }}
       className={clsx(
         'w-full text-left flex items-center gap-2 pr-3 border-b border-hairline-soft font-mono text-xs cursor-pointer hover:bg-bg-card',
         isBase && 'bg-rust-soft',

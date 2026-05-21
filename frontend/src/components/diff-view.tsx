@@ -7,6 +7,7 @@ import { CommentThread } from '#/components/comment-thread'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import type { Comment, Side } from '#/lib/comments'
 import { useDiff, useFileBlobs } from '#/lib/diff-api'
+import { observeHeight, observeInView } from '#/lib/observer-pool'
 
 type PatchDiffProps = ComponentProps<typeof PatchDiff>
 type RenderCustomHeader = PatchDiffProps['renderCustomHeader']
@@ -194,7 +195,7 @@ function FileBlock({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    return observeVirtualisation(el, setInRange)
+    return observeInView(el, DIFF_VIEWPORT_MARGIN, setInRange)
   }, [])
 
   // Remember the rendered height so that when we unmount the content the
@@ -203,7 +204,7 @@ function FileBlock({
     if (!inRange) return
     const el = containerRef.current
     if (!el) return
-    return observeRenderedHeight(el, (h) =>
+    return observeHeight(el, (h) =>
       setStableHeight((prev) => (prev != null && prev > h ? prev : h)),
     )
   }, [inRange])
@@ -212,8 +213,10 @@ function FileBlock({
     if (loading || error || collapsed) return
     const sheet = getDiffsScrollbarSheet()
     if (!sheet) return
+    const wrapper = containerRef.current
+    if (!wrapper) return
     const adopt = () => {
-      const container = containerRef.current?.querySelector('diffs-container')
+      const container = wrapper.querySelector('diffs-container')
       const root = container?.shadowRoot
       if (!root) return false
       if (root.adoptedStyleSheets.includes(sheet)) return true
@@ -221,10 +224,15 @@ function FileBlock({
       return true
     }
     if (adopt()) return
-    const id = window.setInterval(() => {
-      if (adopt()) window.clearInterval(id)
-    }, 100)
-    return () => window.clearInterval(id)
+    // pierre's <PatchDiff> may attach its shadow root in a follow-up tick
+    // after React commits. Replace the prior 100 ms polling loop with a
+    // single MutationObserver that fires the moment the container appears
+    // (or its shadow root mutates), then disconnects.
+    const mo = new MutationObserver(() => {
+      if (adopt()) mo.disconnect()
+    })
+    mo.observe(wrapper, { childList: true, subtree: true })
+    return () => mo.disconnect()
   }, [loading, error, collapsed, patch])
 
   useEffect(() => {
@@ -431,60 +439,7 @@ const FILE_HEADER_HEIGHT = 40
 // and shiki tokens are released. Wide enough that normal scrolling stays
 // inside the warm zone, small enough that hundreds-of-files commits don't
 // drag every diff into memory at once.
-const VIRTUAL_MARGIN_PX = 5000
-
-// Single IntersectionObserver shared across every FileBlock — we used to
-// allocate one per file which scales linearly in observer count. A shared
-// observer with N targets does the same amount of work as N observers with
-// 1 target, but with one shared callback queue and one set of options.
-type VirtualisationCallback = (inRange: boolean) => void
-const virtualisationCallbacks = new WeakMap<Element, VirtualisationCallback>()
-let virtualisationObserver: IntersectionObserver | null = null
-
-function observeVirtualisation(el: Element, cb: VirtualisationCallback): () => void {
-  if (typeof IntersectionObserver === 'undefined') {
-    cb(true)
-    return () => {}
-  }
-  if (virtualisationObserver == null) {
-    virtualisationObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          virtualisationCallbacks.get(entry.target)?.(entry.isIntersecting)
-        }
-      },
-      { rootMargin: `${VIRTUAL_MARGIN_PX}px 0px` },
-    )
-  }
-  virtualisationCallbacks.set(el, cb)
-  virtualisationObserver.observe(el)
-  return () => {
-    virtualisationCallbacks.delete(el)
-    virtualisationObserver?.unobserve(el)
-  }
-}
-
-type HeightCallback = (height: number) => void
-const heightCallbacks = new WeakMap<Element, HeightCallback>()
-let heightObserver: ResizeObserver | null = null
-
-function observeRenderedHeight(el: Element, cb: HeightCallback): () => void {
-  if (typeof ResizeObserver === 'undefined') return () => {}
-  if (heightObserver == null) {
-    heightObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const h = entry.contentRect.height
-        if (h > 0) heightCallbacks.get(entry.target)?.(h)
-      }
-    })
-  }
-  heightCallbacks.set(el, cb)
-  heightObserver.observe(el)
-  return () => {
-    heightCallbacks.delete(el)
-    heightObserver?.unobserve(el)
-  }
-}
+const DIFF_VIEWPORT_MARGIN: IntersectionObserverInit = { rootMargin: '5000px 0px' }
 
 let diffsScrollbarSheetCache: CSSStyleSheet | null = null
 function getDiffsScrollbarSheet(): CSSStyleSheet | null {

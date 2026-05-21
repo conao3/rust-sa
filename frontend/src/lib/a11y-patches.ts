@@ -94,15 +94,16 @@ export function installA11yPatches(): () => void {
     }
   }
   sweep()
-  // Poll shortly after mount for late-attached shadow roots (custom elements
-  // can attach shadow asynchronously). The body-level observer alone misses
-  // hosts that were already in the DOM but had no shadowRoot yet.
-  let polls = 0
-  const pollId = window.setInterval(() => {
+  // pierre's custom elements may not have attached their shadow root yet at
+  // first sweep (autonomous upgrade happens after parsing). Two rAF retries
+  // catch them without the 6-second setInterval poll we used before; any
+  // host added after that is handled by the body-level MutationObserver.
+  const rafA = window.requestAnimationFrame(() => {
     sweep()
-    if (++polls > 40) window.clearInterval(pollId)
-  }, 150)
-  cleanups.add(() => window.clearInterval(pollId))
+    const rafB = window.requestAnimationFrame(sweep)
+    cleanups.add(() => window.cancelAnimationFrame(rafB))
+  })
+  cleanups.add(() => window.cancelAnimationFrame(rafA))
 
   const docObs = new MutationObserver(sweep)
   docObs.observe(document.body, { childList: true, subtree: true })
