@@ -386,10 +386,12 @@ function FileBlock({
 }
 
 const hideDefaultHeader: NonNullable<RenderCustomHeader> = () => null
-// Matches --hunkline-h (22px regular density) and the file-header band
-// (our sticky title bar measures ~40px). Density variations under/over-shoot
-// by a few px per file which is below CLS' 0.1 threshold for an entire page.
-const LINE_HEIGHT = 22
+// Pierre/diffs renders each row at line-height 20px (font-size 13px / lh 20)
+// regardless of our --hunkline-h token, and our sticky title bar measures
+// ~40px. Slight under-estimation keeps the wrapper from over-reserving and
+// leaving visible whitespace between files; tiny CLS during streaming is
+// preferable to a permanent gap.
+const LINE_HEIGHT = 20
 const FILE_HEADER_HEIGHT = 40
 
 let diffsScrollbarSheetCache: CSSStyleSheet | null = null

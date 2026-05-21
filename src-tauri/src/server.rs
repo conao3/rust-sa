@@ -471,11 +471,12 @@ fn base_diff_extras(rev: &str) -> (&'static str, Vec<String>) {
 }
 
 /// Walk a unified-diff output and return, per file, the number of rows the
-/// pierre/diffs renderer will display: one row per hunk header, one per body
-/// line (`@@` not included; lines starting with ` `, `+`, `-`, `\`), plus one
-/// inter-hunk expand row between consecutive hunks. This mirrors what the
-/// viewer actually paints so the frontend can lock min-height without leaving
-/// gaps on small files.
+/// pierre/diffs renderer will paint: one row per hunk header, one per body
+/// line that pierre treats as content. `\ No newline at end of file` lines
+/// are metadata (they flip a flag but don't add a row), and inter-hunk
+/// expand rows only appear when pierre detects collapsed context — we don't
+/// reproduce that prediction here, so we under-count by 1 row per such
+/// gap. That's preferable to over-counting and leaving visible whitespace.
 fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String, i32> {
     let mut out: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
     let mut current_path: Option<String> = None;
@@ -486,7 +487,7 @@ fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String,
     let commit = |path: &Option<String>, body: i32, hunks: i32, map: &mut std::collections::HashMap<String, i32>| {
         if let Some(p) = path {
             if hunks > 0 {
-                let total = body + hunks + (hunks - 1).max(0);
+                let total = body + hunks;
                 map.entry(p.clone())
                     .and_modify(|v| *v += total)
                     .or_insert(total);
@@ -506,7 +507,7 @@ fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String,
             in_hunk = true;
         } else if in_hunk {
             let first = line.as_bytes().first().copied();
-            if matches!(first, Some(b' ') | Some(b'+') | Some(b'-') | Some(b'\\')) {
+            if matches!(first, Some(b' ') | Some(b'+') | Some(b'-')) {
                 body += 1;
             }
         }
