@@ -21,9 +21,11 @@ interface DiffViewFile {
   path: string
   additions?: number
   deletions?: number
-  /** Row count the renderer will paint (hunk headers + body + expand rows);
-   * used to reserve min-height and keep CLS at 0 while streaming hunks. */
+  /** Row count the unified-mode renderer will paint. */
   visibleLines?: number
+  /** Row count the split-mode renderer will paint (paired add/del rows share
+   * a single visual row). The active layout picks one of the two. */
+  visibleLinesSplit?: number
 }
 
 interface AddCommentInput {
@@ -78,6 +80,7 @@ export function DiffView({
           additions={f.additions ?? 0}
           deletions={f.deletions ?? 0}
           visibleLines={f.visibleLines}
+          visibleLinesSplit={f.visibleLinesSplit}
           refreshKey={refreshKey}
           initialPatch={initialPatches?.[f.path]}
           layout={layout}
@@ -101,6 +104,7 @@ interface FileBlockProps {
   additions: number
   deletions: number
   visibleLines?: number
+  visibleLinesSplit?: number
   refreshKey: number
   initialPatch?: string
   layout: 'unified' | 'split'
@@ -126,6 +130,7 @@ function FileBlock({
   additions,
   deletions,
   visibleLines,
+  visibleLinesSplit,
   refreshKey,
   initialPatch,
   layout,
@@ -158,13 +163,15 @@ function FileBlock({
       return undefined
     }
   }, [patch, blobs.available, blobs.error, blobs.oldText, blobs.newText, path])
-  // visibleLines comes from the backend's parse of the unified diff (hunk
-  // headers + body lines + inter-hunk expand rows) and matches what
-  // pierre/diffs actually renders to within ±1 row. Fall back to a generous
-  // additions+deletions estimate only when the field is missing (older API).
+  // visibleLines / visibleLinesSplit come from the backend's parse of the
+  // unified diff and match pierre/diffs' row count for each mode to within
+  // ±1. The active layout decides which one we reserve against. Fall back to
+  // a generous additions+deletions estimate only when neither field is
+  // present (older API).
+  const visibleForLayout = layout === 'split' ? visibleLinesSplit : visibleLines
   const reservedHeight =
-    visibleLines != null
-      ? Math.max(80, visibleLines * LINE_HEIGHT + FILE_HEADER_HEIGHT)
+    visibleForLayout != null
+      ? Math.max(80, visibleForLayout * LINE_HEIGHT + FILE_HEADER_HEIGHT)
       : Math.max(240, (additions + deletions + 30) * 22)
   const [composing, setComposing] = useState<ComposingState | null>(null)
   const [composerBody, setComposerBody] = useState('')
@@ -311,8 +318,8 @@ function FileBlock({
         containIntrinsicSize: `auto ${reservedHeight}px`,
         // Reserve the rendered height up-front so streaming hunks don't push
         // subsequent files down. visibleLines-based estimates are accurate to
-        // ±1 row so this leaves at most ~22px of slack per file.
-        minHeight: visibleLines != null ? reservedHeight : undefined,
+        // ±1 row so this leaves at most ~20px of slack per file.
+        minHeight: visibleForLayout != null ? reservedHeight : undefined,
       }
 
   if (loading && !patch) {

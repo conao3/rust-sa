@@ -17,6 +17,7 @@ query PreviewFiles($rev: String!, $repo: String!) {
     additions
     deletions
     visibleLines
+    visibleLinesSplit
   }
 }
 

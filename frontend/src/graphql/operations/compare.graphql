@@ -5,5 +5,6 @@ query Files($rev: String!, $repo: String!, $w: Boolean) {
     additions
     deletions
     visibleLines
+    visibleLinesSplit
   }
 }

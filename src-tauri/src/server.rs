@@ -41,11 +41,14 @@ struct FileEntry {
     status: String,
     additions: i32,
     deletions: i32,
-    /// Number of rows the unified-diff viewer will render for this file
-    /// (hunk headers + body lines + inter-hunk expand rows). The frontend
-    /// uses this to reserve min-height before the diff streams in so it can
-    /// hit CLS=0 without leaving large gaps on small files.
+    /// Row count the *unified* viewer will paint (hunk headers + body lines).
+    /// Frontend uses this to lock min-height in unified mode so streaming
+    /// hunks don't push later files down (CLS=0) without leaving gaps.
     visible_lines: i32,
+    /// Row count the *split* viewer will paint. In split mode pierre/diffs
+    /// pairs adjacent additions and deletions on the same row so each
+    /// change group contributes `max(adds, dels)` rather than `adds + dels`.
+    visible_lines_split: i32,
 }
 
 #[derive(SimpleObject)]
@@ -199,14 +202,20 @@ impl Query {
                 None => continue,
             };
             let path = normalize_renamed_path(raw);
-            let vis = visible.get(&path).copied().unwrap_or(0);
+            let (vis_u, vis_s) = visible
+                .get(&path)
+                .map(|v| (v.unified, v.split))
+                .unwrap_or((0, 0));
             entries
                 .entry(path.clone())
                 .and_modify(|e| {
                     e.additions += add;
                     e.deletions += del;
                     if e.visible_lines == 0 {
-                        e.visible_lines = vis;
+                        e.visible_lines = vis_u;
+                    }
+                    if e.visible_lines_split == 0 {
+                        e.visible_lines_split = vis_s;
                     }
                 })
                 .or_insert(FileEntry {
@@ -214,7 +223,8 @@ impl Query {
                     status: "modified".into(),
                     additions: add,
                     deletions: del,
-                    visible_lines: vis,
+                    visible_lines: vis_u,
+                    visible_lines_split: vis_s,
                 });
         }
         for line in String::from_utf8_lossy(&name_status.stdout).lines() {
@@ -231,7 +241,10 @@ impl Query {
                 'C' => "copied",
                 _ => "modified",
             };
-            let vis = visible.get(&path).copied().unwrap_or(0);
+            let (vis_u, vis_s) = visible
+                .get(&path)
+                .map(|v| (v.unified, v.split))
+                .unwrap_or((0, 0));
             entries
                 .entry(path.clone())
                 .and_modify(|e| e.status = status.into())
@@ -240,7 +253,8 @@ impl Query {
                     status: status.into(),
                     additions: 0,
                     deletions: 0,
-                    visible_lines: vis,
+                    visible_lines: vis_u,
+                    visible_lines_split: vis_s,
                 });
         }
         Ok(entries.into_values().collect())
@@ -470,49 +484,96 @@ fn base_diff_extras(rev: &str) -> (&'static str, Vec<String>) {
     )
 }
 
-/// Walk a unified-diff output and return, per file, the number of rows the
-/// pierre/diffs renderer will paint: one row per hunk header, one per body
-/// line that pierre treats as content. `\ No newline at end of file` lines
-/// are metadata (they flip a flag but don't add a row), and inter-hunk
-/// expand rows only appear when pierre detects collapsed context — we don't
-/// reproduce that prediction here, so we under-count by 1 row per such
-/// gap. That's preferable to over-counting and leaving visible whitespace.
-fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String, i32> {
-    let mut out: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+struct VisibleLines {
+    unified: i32,
+    split: i32,
+}
+
+/// Walk a unified-diff output and return, per file, the row count pierre/diffs
+/// will paint in each mode. Mirrors pierre's `unifiedLineCount` /
+/// `splitLineCount` (see `parsePatchFiles.ts`):
+///
+/// - unified: 1 per hunk header + every body line (additions, deletions,
+///   context). `\ No newline at end of file` is metadata, not a row.
+/// - split: 1 per hunk header + context lines + sum over each change group
+///   of `max(adds, dels)` since pierre stacks paired add/del rows side by
+///   side, while unmatched leftovers cascade onto their own rows.
+///
+/// Inter-hunk expand rows are pierre-internal and only appear when context
+/// is collapsed, so we deliberately under-count by ≤1 row per gap to avoid
+/// permanent whitespace; the tiny CLS during streaming is preferable.
+fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String, VisibleLines> {
+    let mut out: std::collections::HashMap<String, VisibleLines> = std::collections::HashMap::new();
     let mut current_path: Option<String> = None;
-    let mut body: i32 = 0;
+    let mut unified_body: i32 = 0;
+    let mut split_body: i32 = 0;
     let mut hunks: i32 = 0;
     let mut in_hunk = false;
+    let mut group_adds: i32 = 0;
+    let mut group_dels: i32 = 0;
 
-    let commit = |path: &Option<String>, body: i32, hunks: i32, map: &mut std::collections::HashMap<String, i32>| {
+    let flush_group = |adds: &mut i32, dels: &mut i32, split_body: &mut i32| {
+        if *adds > 0 || *dels > 0 {
+            *split_body += std::cmp::max(*adds, *dels);
+            *adds = 0;
+            *dels = 0;
+        }
+    };
+
+    let commit = |path: &Option<String>,
+                  unified_body: i32,
+                  split_body: i32,
+                  hunks: i32,
+                  map: &mut std::collections::HashMap<String, VisibleLines>| {
         if let Some(p) = path {
             if hunks > 0 {
-                let total = body + hunks;
                 map.entry(p.clone())
-                    .and_modify(|v| *v += total)
-                    .or_insert(total);
+                    .and_modify(|v| {
+                        v.unified += unified_body + hunks;
+                        v.split += split_body + hunks;
+                    })
+                    .or_insert(VisibleLines {
+                        unified: unified_body + hunks,
+                        split: split_body + hunks,
+                    });
             }
         }
     };
 
     for line in diff.lines() {
         if let Some(rest) = line.strip_prefix("diff --git ") {
-            commit(&current_path, body, hunks, &mut out);
+            flush_group(&mut group_adds, &mut group_dels, &mut split_body);
+            commit(&current_path, unified_body, split_body, hunks, &mut out);
             current_path = parse_diff_git_new_path(rest);
-            body = 0;
+            unified_body = 0;
+            split_body = 0;
             hunks = 0;
             in_hunk = false;
         } else if line.starts_with("@@") {
+            flush_group(&mut group_adds, &mut group_dels, &mut split_body);
             hunks += 1;
             in_hunk = true;
         } else if in_hunk {
-            let first = line.as_bytes().first().copied();
-            if matches!(first, Some(b' ') | Some(b'+') | Some(b'-')) {
-                body += 1;
+            match line.as_bytes().first().copied() {
+                Some(b'+') => {
+                    unified_body += 1;
+                    group_adds += 1;
+                }
+                Some(b'-') => {
+                    unified_body += 1;
+                    group_dels += 1;
+                }
+                Some(b' ') => {
+                    unified_body += 1;
+                    flush_group(&mut group_adds, &mut group_dels, &mut split_body);
+                    split_body += 1;
+                }
+                _ => {}
             }
         }
     }
-    commit(&current_path, body, hunks, &mut out);
+    flush_group(&mut group_adds, &mut group_dels, &mut split_body);
+    commit(&current_path, unified_body, split_body, hunks, &mut out);
     out
 }
 
