@@ -23,6 +23,7 @@ interface FileEntry {
   status: string
   additions: number
   deletions: number
+  visibleLines: number
 }
 
 function gitStatusKey(s: string): GitStatusEntry['status'] {
@@ -37,6 +38,7 @@ const FILES_QUERY = gql`
       status
       additions
       deletions
+      visibleLines
     }
   }
 `
@@ -92,7 +94,7 @@ export const Route = createFileRoute('/compare/$')({
     }
     const { executeGraphQL } = await import('#/lib/apollo')
     const data = await executeGraphQL<{ files: FileEntry[] }>(
-      'query Files($rev: String!, $repo: String!, $w: Boolean) { files(rev: $rev, repo: $repo, w: $w) { path status additions deletions } }',
+      'query Files($rev: String!, $repo: String!, $w: Boolean) { files(rev: $rev, repo: $repo, w: $w) { path status additions deletions visibleLines } }',
       { rev, repo, w },
       'Files',
     )

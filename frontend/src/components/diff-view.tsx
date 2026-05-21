@@ -21,6 +21,9 @@ interface DiffViewFile {
   path: string
   additions?: number
   deletions?: number
+  /** Row count the renderer will paint (hunk headers + body + expand rows);
+   * used to reserve min-height and keep CLS at 0 while streaming hunks. */
+  visibleLines?: number
 }
 
 interface AddCommentInput {
@@ -74,6 +77,7 @@ export function DiffView({
           repo={repo}
           additions={f.additions ?? 0}
           deletions={f.deletions ?? 0}
+          visibleLines={f.visibleLines}
           refreshKey={refreshKey}
           initialPatch={initialPatches?.[f.path]}
           layout={layout}
@@ -96,6 +100,7 @@ interface FileBlockProps {
   repo: string
   additions: number
   deletions: number
+  visibleLines?: number
   refreshKey: number
   initialPatch?: string
   layout: 'unified' | 'split'
@@ -120,6 +125,7 @@ function FileBlock({
   repo,
   additions,
   deletions,
+  visibleLines,
   refreshKey,
   initialPatch,
   layout,
@@ -152,7 +158,14 @@ function FileBlock({
       return undefined
     }
   }, [patch, blobs.available, blobs.error, blobs.oldText, blobs.newText, path])
-  const reservedHeight = Math.max(240, (additions + deletions + 30) * 22)
+  // visibleLines comes from the backend's parse of the unified diff (hunk
+  // headers + body lines + inter-hunk expand rows) and matches what
+  // pierre/diffs actually renders to within ±1 row. Fall back to a generous
+  // additions+deletions estimate only when the field is missing (older API).
+  const reservedHeight =
+    visibleLines != null
+      ? Math.max(80, visibleLines * LINE_HEIGHT + FILE_HEADER_HEIGHT)
+      : Math.max(240, (additions + deletions + 30) * 22)
   const [composing, setComposing] = useState<ComposingState | null>(null)
   const [composerBody, setComposerBody] = useState('')
   const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null)
@@ -296,6 +309,10 @@ function FileBlock({
     : {
         contentVisibility: 'auto',
         containIntrinsicSize: `auto ${reservedHeight}px`,
+        // Reserve the rendered height up-front so streaming hunks don't push
+        // subsequent files down. visibleLines-based estimates are accurate to
+        // ±1 row so this leaves at most ~22px of slack per file.
+        minHeight: visibleLines != null ? reservedHeight : undefined,
       }
 
   if (loading && !patch) {
@@ -369,6 +386,11 @@ function FileBlock({
 }
 
 const hideDefaultHeader: NonNullable<RenderCustomHeader> = () => null
+// Matches --hunkline-h (22px regular density) and the file-header band
+// (our sticky title bar measures ~40px). Density variations under/over-shoot
+// by a few px per file which is below CLS' 0.1 threshold for an entire page.
+const LINE_HEIGHT = 22
+const FILE_HEADER_HEIGHT = 40
 
 let diffsScrollbarSheetCache: CSSStyleSheet | null = null
 function getDiffsScrollbarSheet(): CSSStyleSheet | null {

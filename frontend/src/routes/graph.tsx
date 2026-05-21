@@ -113,6 +113,7 @@ interface PreviewFile {
   status: string
   additions: number
   deletions: number
+  visibleLines: number
 }
 
 const PREVIEW_FILES_QUERY = gql`
@@ -122,6 +123,7 @@ const PREVIEW_FILES_QUERY = gql`
       status
       additions
       deletions
+      visibleLines
     }
   }
 `

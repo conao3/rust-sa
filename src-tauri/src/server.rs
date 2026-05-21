@@ -41,6 +41,11 @@ struct FileEntry {
     status: String,
     additions: i32,
     deletions: i32,
+    /// Number of rows the unified-diff viewer will render for this file
+    /// (hunk headers + body lines + inter-hunk expand rows). The frontend
+    /// uses this to reserve min-height before the diff streams in so it can
+    /// hit CLS=0 without leaving large gaps on small files.
+    visible_lines: i32,
 }
 
 #[derive(SimpleObject)]
@@ -163,21 +168,26 @@ impl Query {
         let mut numstat_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--numstat".into()];
         numstat_args.extend(extra.clone());
         let mut status_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--name-status".into()];
-        status_args.extend(extra);
+        status_args.extend(extra.clone());
+        let mut diff_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into()];
+        diff_args.extend(extra);
 
         let cwd = PathBuf::from(&repo);
-        let (numstat, name_status) = tokio::join!(
+        let (numstat, name_status, full_diff) = tokio::join!(
             tokio::process::Command::new("git").current_dir(&cwd).args(&numstat_args).output(),
             tokio::process::Command::new("git").current_dir(&cwd).args(&status_args).output(),
+            tokio::process::Command::new("git").current_dir(&cwd).args(&diff_args).output(),
         );
         let numstat = numstat.map_err(|e| async_graphql::Error::new(format!("git numstat: {e}")))?;
         let name_status = name_status.map_err(|e| async_graphql::Error::new(format!("git name-status: {e}")))?;
+        let full_diff = full_diff.map_err(|e| async_graphql::Error::new(format!("git diff: {e}")))?;
         if !numstat.status.success() || !name_status.status.success() {
             return Err(async_graphql::Error::new(format!(
                 "git {rev}: {}",
                 String::from_utf8_lossy(&numstat.stderr)
             )));
         }
+        let visible = count_visible_lines_per_file(&String::from_utf8_lossy(&full_diff.stdout));
 
         let mut entries: std::collections::BTreeMap<String, FileEntry> = std::collections::BTreeMap::new();
         for line in String::from_utf8_lossy(&numstat.stdout).lines() {
@@ -189,17 +199,22 @@ impl Query {
                 None => continue,
             };
             let path = normalize_renamed_path(raw);
+            let vis = visible.get(&path).copied().unwrap_or(0);
             entries
                 .entry(path.clone())
                 .and_modify(|e| {
                     e.additions += add;
                     e.deletions += del;
+                    if e.visible_lines == 0 {
+                        e.visible_lines = vis;
+                    }
                 })
                 .or_insert(FileEntry {
                     path,
                     status: "modified".into(),
                     additions: add,
                     deletions: del,
+                    visible_lines: vis,
                 });
         }
         for line in String::from_utf8_lossy(&name_status.stdout).lines() {
@@ -216,6 +231,7 @@ impl Query {
                 'C' => "copied",
                 _ => "modified",
             };
+            let vis = visible.get(&path).copied().unwrap_or(0);
             entries
                 .entry(path.clone())
                 .and_modify(|e| e.status = status.into())
@@ -224,6 +240,7 @@ impl Query {
                     status: status.into(),
                     additions: 0,
                     deletions: 0,
+                    visible_lines: vis,
                 });
         }
         Ok(entries.into_values().collect())
@@ -451,6 +468,63 @@ fn base_diff_extras(rev: &str) -> (&'static str, Vec<String>) {
             rev.into(),
         ],
     )
+}
+
+/// Walk a unified-diff output and return, per file, the number of rows the
+/// pierre/diffs renderer will display: one row per hunk header, one per body
+/// line (`@@` not included; lines starting with ` `, `+`, `-`, `\`), plus one
+/// inter-hunk expand row between consecutive hunks. This mirrors what the
+/// viewer actually paints so the frontend can lock min-height without leaving
+/// gaps on small files.
+fn count_visible_lines_per_file(diff: &str) -> std::collections::HashMap<String, i32> {
+    let mut out: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    let mut current_path: Option<String> = None;
+    let mut body: i32 = 0;
+    let mut hunks: i32 = 0;
+    let mut in_hunk = false;
+
+    let commit = |path: &Option<String>, body: i32, hunks: i32, map: &mut std::collections::HashMap<String, i32>| {
+        if let Some(p) = path {
+            if hunks > 0 {
+                let total = body + hunks + (hunks - 1).max(0);
+                map.entry(p.clone())
+                    .and_modify(|v| *v += total)
+                    .or_insert(total);
+            }
+        }
+    };
+
+    for line in diff.lines() {
+        if let Some(rest) = line.strip_prefix("diff --git ") {
+            commit(&current_path, body, hunks, &mut out);
+            current_path = parse_diff_git_new_path(rest);
+            body = 0;
+            hunks = 0;
+            in_hunk = false;
+        } else if line.starts_with("@@") {
+            hunks += 1;
+            in_hunk = true;
+        } else if in_hunk {
+            let first = line.as_bytes().first().copied();
+            if matches!(first, Some(b' ') | Some(b'+') | Some(b'-') | Some(b'\\')) {
+                body += 1;
+            }
+        }
+    }
+    commit(&current_path, body, hunks, &mut out);
+    out
+}
+
+/// Extract the new-side path from a `diff --git a/<old> b/<new>` line, using
+/// the last occurrence of ` b/` so paths containing spaces still parse. Git
+/// quotes paths with truly unprintable bytes; with `core.quotePath=false` that
+/// only affects names with literal quotes/tabs/newlines, which we leave alone.
+fn parse_diff_git_new_path(rest: &str) -> Option<String> {
+    let trimmed = rest.trim_end();
+    let idx = trimmed.rfind(" b/")?;
+    let raw = &trimmed[idx + 3..];
+    let stripped = raw.strip_prefix('"').and_then(|s| s.strip_suffix('"')).unwrap_or(raw);
+    Some(stripped.to_string())
 }
 
 fn normalize_renamed_path(raw: &str) -> String {
