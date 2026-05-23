@@ -1,9 +1,10 @@
 import { processFile, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, PatchDiff } from '@pierre/diffs/react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { CommentComposer } from '#/components/comment-composer'
 import { CommentThread } from '#/components/comment-thread'
+import { computeWrapperMinHeight, useStableHeight } from '#/components/diff-view-height'
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import type { Comment, Side } from '#/lib/comments'
 import { useDiff, useFileBlobs } from '#/lib/diff-api'
@@ -185,7 +186,6 @@ function FileBlock({
   // and the shiki tokenisation cost. SSR mounts every block (no IO on
   // server) so the initial paint hydrates with content in place.
   const [inRange, setInRange] = useState(true)
-  const [stableHeight, setStableHeight] = useState<number | null>(null)
 
   const handleToggleViewed = () => {
     setCollapsed(!viewed)
@@ -198,16 +198,21 @@ function FileBlock({
     return observeInView(el, DIFF_VIEWPORT_MARGIN, setInRange)
   }, [])
 
-  // Remember the rendered height so that when we unmount the content the
-  // placeholder doesn't shrink and shift everything below it upward.
-  useEffect(() => {
-    if (!inRange) return
-    const el = containerRef.current
-    if (!el) return
-    return observeHeight(el, (h) =>
-      setStableHeight((prev) => (prev != null && prev > h ? prev : h)),
-    )
-  }, [inRange])
+  // Remember the rendered height so that the placeholder we leave behind when
+  // the block scrolls out of the warm zone matches the real size. Tying the
+  // observer subscription to `inRange` and `layout` makes the hook reset its
+  // measurement when the active layout changes, otherwise a unified-mode
+  // height would pin the wrapper open after switching to split.
+  const observe = useCallback<(cb: (h: number) => void) => () => void>(
+    (cb) => {
+      if (!inRange) return () => {}
+      const el = containerRef.current
+      if (!el) return () => {}
+      return observeHeight(el, cb)
+    },
+    [inRange],
+  )
+  const { stableHeight } = useStableHeight({ layout, observe })
 
   useEffect(() => {
     if (loading || error || collapsed) return
@@ -343,11 +348,13 @@ function FileBlock({
     return null
   }
 
-  // Use the last measured rendered height when available so the placeholder
-  // we leave behind after virtualising-out matches the real size; fall back
-  // to the visibleLines estimate for first paint.
-  const placeholderHeight = Math.max(stableHeight ?? 0, reservedHeight)
-  const wrapperStyle: React.CSSProperties = collapsed ? {} : { minHeight: placeholderHeight }
+  // While the block is in range the mounted content decides its own height,
+  // so we only reserve `reservedHeight` to absorb CLS during streaming.
+  // Once virtualised out we keep `max(stableHeight, reservedHeight)` so the
+  // placeholder does not collapse. `computeWrapperMinHeight` is the single
+  // source of truth and is covered by `diff-view-height.test.ts`.
+  const minHeight = computeWrapperMinHeight({ collapsed, inRange, stableHeight, reservedHeight })
+  const wrapperStyle: React.CSSProperties = minHeight != null ? { minHeight } : {}
 
   if (loading && !patch) {
     return (
