@@ -484,6 +484,7 @@ fn base_diff_extras(rev: &str) -> (&'static str, Vec<String>) {
     )
 }
 
+#[derive(Clone, Copy)]
 struct VisibleLines {
     unified: i32,
     split: i32,
@@ -891,4 +892,138 @@ where
     }
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn count(diff: &str, path: &str) -> VisibleLines {
+        *count_visible_lines_per_file(diff)
+            .get(path)
+            .unwrap_or_else(|| panic!("path {path} not in diff"))
+    }
+
+    #[test]
+    fn paired_change_group_collapses_in_split_mode() {
+        // One hunk, 1 deletion immediately followed by 1 addition. Pierre
+        // pairs them onto a single visual row in split mode, so split count
+        // must be smaller than unified — this is the invariant that the
+        // "gap between files" regression keeps tripping over.
+        let diff = "\
+diff --git a/a b/a
+@@ -1,2 +1,2 @@
+-old
++new
+ context
+";
+        let v = count(diff, "a");
+        assert_eq!(v.unified, 4, "1 hunk + 3 body lines");
+        assert_eq!(v.split, 3, "1 hunk + max(1,1) paired + 1 context");
+    }
+
+    #[test]
+    fn unmatched_add_in_change_group_takes_its_own_row_in_split() {
+        // 1 deletion, then 2 additions, with no interleaved context. Pierre
+        // stacks the pair onto one row and the unmatched extra add cascades
+        // onto its own row, so split body = max(2, 1) = 2.
+        let diff = "\
+diff --git a/b b/b
+@@ -1,1 +1,2 @@
+-old
++new1
++new2
+";
+        let v = count(diff, "b");
+        assert_eq!(v.unified, 4, "1 hunk + 3 body lines");
+        assert_eq!(v.split, 3, "1 hunk + max(2,1)");
+    }
+
+    #[test]
+    fn pure_addition_split_equals_unified() {
+        // No deletions, no pairing. Split and unified must match.
+        let diff = "\
+diff --git a/c b/c
+@@ -0,0 +1,3 @@
++a
++b
++c
+";
+        let v = count(diff, "c");
+        assert_eq!(v.unified, 4);
+        assert_eq!(v.split, 4);
+    }
+
+    #[test]
+    fn context_only_split_equals_unified() {
+        let diff = "\
+diff --git a/d b/d
+@@ -1,3 +1,3 @@
+ x
+ y
+ z
+";
+        let v = count(diff, "d");
+        assert_eq!(v.unified, 4);
+        assert_eq!(v.split, 4);
+    }
+
+    #[test]
+    fn multiple_hunks_separate_change_groups() {
+        // Two hunks, each with its own paired change. The group flush must
+        // happen at each hunk boundary so split body sums per-group max.
+        let diff = "\
+diff --git a/e b/e
+@@ -1,2 +1,2 @@
+-a
++b
+@@ -10,2 +10,2 @@
+-c
++d
+";
+        let v = count(diff, "e");
+        assert_eq!(v.unified, 6, "2 hunk headers + 4 body");
+        assert_eq!(v.split, 4, "2 hunk headers + max(1,1) twice");
+    }
+
+    #[test]
+    fn split_count_never_exceeds_unified() {
+        // Invariant: split mode collapses pairs, so split <= unified for any
+        // diff. This is the cheapest guard against overestimating the
+        // split-mode reservation, which is what produces the gap.
+        let diffs = [
+            "\
+diff --git a/f b/f
+@@ -1,5 +1,5 @@
+-a
+-b
+-c
++x
++y
++z
+ ctx
+",
+            "\
+diff --git a/g b/g
+@@ -1,1 +1,4 @@
++a
++b
++c
++d
+",
+            "\
+diff --git a/h b/h
+@@ -1,4 +1,1 @@
+-a
+-b
+-c
+-d
+",
+        ];
+        for diff in diffs {
+            for (_, v) in count_visible_lines_per_file(diff) {
+                assert!(v.split <= v.unified, "split ({}) > unified ({})", v.split, v.unified);
+            }
+        }
+    }
 }
