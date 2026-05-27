@@ -86,6 +86,11 @@ fn backend_error_to_string(err: BackendError) -> String {
 }
 
 fn main() {
+    if std::env::args().any(|a| a == "--schema") {
+        print!("{}", build_schema().sdl());
+        return;
+    }
+
     if std::env::args().any(|a| a == "--serve") {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()

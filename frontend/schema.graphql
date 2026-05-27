@@ -1,0 +1,79 @@
+type Commit {
+	sha: String!
+	short: String!
+	message: String!
+	author: String!
+	when: String!
+	refs: String!
+	parents: [String!]!
+}
+
+type DirEntry {
+	name: String!
+	isDir: Boolean!
+	isGitRepo: Boolean!
+	isHidden: Boolean!
+}
+
+type DirListing {
+	path: String!
+	parent: String
+	entries: [DirEntry!]!
+}
+
+type FileEntry {
+	path: String!
+	status: String!
+	additions: Int!
+	deletions: Int!
+	"""
+	Row count the *unified* viewer will paint (hunk headers + body lines).
+	Frontend uses this to lock min-height in unified mode so streaming
+	hunks don't push later files down (CLS=0) without leaving gaps.
+	"""
+	visibleLines: Int!
+	"""
+	Row count the *split* viewer will paint. In split mode pierre/diffs
+	pairs adjacent additions and deletions on the same row so each
+	change group contributes `max(adds, dels)` rather than `adds + dels`.
+	"""
+	visibleLinesSplit: Int!
+}
+
+type GitRef {
+	name: String!
+	shortSha: String!
+	isCurrent: Boolean!
+}
+
+type Mutation {
+	setPreferences(theme: String): Preferences!
+}
+
+type Preferences {
+	theme: String!
+}
+
+type Query {
+	health: String!
+	preferences: Preferences!
+	listDir(path: String): DirListing!
+	files(rev: String, repo: String!, w: Boolean): [FileEntry!]!
+	commits(limit: Int, skip: Int, repo: String!): [Commit!]!
+	branches(repo: String!): [GitRef!]!
+	tags(repo: String!): [GitRef!]!
+	tree(repo: String!, rev: String): [String!]!
+}
+
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+schema {
+	query: Query
+	mutation: Mutation
+}
