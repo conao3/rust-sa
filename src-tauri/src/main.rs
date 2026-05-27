@@ -3,9 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use tauri::{ipc::Channel, AppHandle, State, WebviewUrl, WebviewWindowBuilder};
 
-use conao3_sa::server::{
-    blob_text, build_schema, diff_text, watcher_for, AppSchema, BackendError,
-};
+use conao3_sa::server::{blob_text, build_schema, diff_text, watcher_for, AppSchema, BackendError};
 
 #[tauri::command]
 async fn graphql(

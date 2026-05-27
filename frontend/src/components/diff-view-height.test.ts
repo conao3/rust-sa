@@ -88,9 +88,7 @@ describe('useStableHeight', () => {
         emit = null
       }
     }
-    const { result } = renderHook(() =>
-      useStableHeight({ layout: 'unified', observe: observer }),
-    )
+    const { result } = renderHook(() => useStableHeight({ layout: 'unified', observe: observer }))
     act(() => emit?.(500))
     expect(result.current.stableHeight).toBe(500)
     act(() => emit?.(700))
@@ -123,9 +121,7 @@ describe('useStableHeight', () => {
   it('calls the observer cleanup on unmount', () => {
     const cleanup = vi.fn()
     const observer = () => cleanup
-    const { unmount } = renderHook(() =>
-      useStableHeight({ layout: 'unified', observe: observer }),
-    )
+    const { unmount } = renderHook(() => useStableHeight({ layout: 'unified', observe: observer }))
     unmount()
     expect(cleanup).toHaveBeenCalledTimes(1)
   })

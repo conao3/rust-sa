@@ -9,8 +9,6 @@
     "@tanstack/router-plugin",
     "@tailwindcss/typography",
     "tailwindcss",
-    "@testing-library/dom",
-    "@testing-library/react",
     "oxlint",
     "oxfmt"
   ]

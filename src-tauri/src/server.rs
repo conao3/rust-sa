@@ -3,7 +3,10 @@ use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Query as AxumQuery,
     http::{header, StatusCode},
-    response::{sse::{Event, KeepAlive, Sse}, IntoResponse, Response},
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse, Response,
+    },
     routing::{get, post},
     Extension, Router,
 };
@@ -22,7 +25,10 @@ use std::{
 };
 use tokio::{net::TcpListener, sync::broadcast};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
-use tower_http::{compression::CompressionLayer, cors::{Any, CorsLayer}};
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+};
 
 #[derive(SimpleObject)]
 struct Commit {
@@ -90,7 +96,11 @@ fn load_preferences() -> Preferences {
     let path = config_path();
     let raw = match std::fs::read_to_string(&path) {
         Ok(s) => s,
-        Err(_) => return Preferences { theme: "light".into() },
+        Err(_) => {
+            return Preferences {
+                theme: "light".into(),
+            }
+        }
     };
     let mut prefs: Preferences = toml::from_str(&raw).unwrap_or_default();
     if prefs.theme.is_empty() {
@@ -104,8 +114,7 @@ fn save_preferences(prefs: &Preferences) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let body = toml::to_string_pretty(prefs)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let body = toml::to_string_pretty(prefs).map_err(std::io::Error::other)?;
     std::fs::write(path, body)
 }
 
@@ -127,11 +136,14 @@ impl Query {
             .map(PathBuf::from)
             .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from("/"));
-        let start = start
-            .canonicalize()
-            .map_err(|e| async_graphql::Error::new(format!("canonicalize {}: {e}", start.display())))?;
+        let start = start.canonicalize().map_err(|e| {
+            async_graphql::Error::new(format!("canonicalize {}: {e}", start.display()))
+        })?;
         if !start.is_dir() {
-            return Err(async_graphql::Error::new(format!("not a directory: {}", start.display())));
+            return Err(async_graphql::Error::new(format!(
+                "not a directory: {}",
+                start.display()
+            )));
         }
         let mut entries: Vec<DirEntry> = std::fs::read_dir(&start)
             .map_err(|e| async_graphql::Error::new(format!("read_dir {}: {e}", start.display())))?
@@ -140,10 +152,18 @@ impl Query {
                 let name = e.file_name().to_string_lossy().into_owned();
                 let ft = e.file_type().ok()?;
                 let is_dir = ft.is_dir()
-                    || (ft.is_symlink() && std::fs::metadata(e.path()).map(|m| m.is_dir()).unwrap_or(false));
+                    || (ft.is_symlink()
+                        && std::fs::metadata(e.path())
+                            .map(|m| m.is_dir())
+                            .unwrap_or(false));
                 let is_git_repo = is_dir && e.path().join(".git").exists();
                 let is_hidden = name.starts_with('.');
-                Some(DirEntry { name, is_dir, is_git_repo, is_hidden })
+                Some(DirEntry {
+                    name,
+                    is_dir,
+                    is_git_repo,
+                    is_hidden,
+                })
             })
             .collect();
         entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
@@ -168,22 +188,51 @@ impl Query {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
         let (subcmd, extra) = diff_extras_for_rev(&rev, w.unwrap_or(false));
 
-        let mut numstat_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--numstat".into()];
+        let mut numstat_args: Vec<String> = vec![
+            "-c".into(),
+            "core.quotePath=false".into(),
+            subcmd.into(),
+            "--no-color".into(),
+            "--numstat".into(),
+        ];
         numstat_args.extend(extra.clone());
-        let mut status_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into(), "--name-status".into()];
+        let mut status_args: Vec<String> = vec![
+            "-c".into(),
+            "core.quotePath=false".into(),
+            subcmd.into(),
+            "--no-color".into(),
+            "--name-status".into(),
+        ];
         status_args.extend(extra.clone());
-        let mut diff_args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into()];
+        let mut diff_args: Vec<String> = vec![
+            "-c".into(),
+            "core.quotePath=false".into(),
+            subcmd.into(),
+            "--no-color".into(),
+        ];
         diff_args.extend(extra);
 
         let cwd = PathBuf::from(&repo);
         let (numstat, name_status, full_diff) = tokio::join!(
-            tokio::process::Command::new("git").current_dir(&cwd).args(&numstat_args).output(),
-            tokio::process::Command::new("git").current_dir(&cwd).args(&status_args).output(),
-            tokio::process::Command::new("git").current_dir(&cwd).args(&diff_args).output(),
+            tokio::process::Command::new("git")
+                .current_dir(&cwd)
+                .args(&numstat_args)
+                .output(),
+            tokio::process::Command::new("git")
+                .current_dir(&cwd)
+                .args(&status_args)
+                .output(),
+            tokio::process::Command::new("git")
+                .current_dir(&cwd)
+                .args(&diff_args)
+                .output(),
         );
-        let numstat = numstat.map_err(|e| async_graphql::Error::new(format!("git numstat: {e}")))?;
-        let name_status = name_status.map_err(|e| async_graphql::Error::new(format!("git name-status: {e}")))?;
-        let full_diff = full_diff.map_err(|e| async_graphql::Error::new(format!("git diff: {e}")))?;
+        let numstat =
+            numstat.map_err(|e| async_graphql::Error::new(format!("git numstat: {e}")))?;
+        let name_status =
+            name_status.map_err(|e| async_graphql::Error::new(format!("git name-status: {e}")))?;
+        let full_diff =
+            full_diff.map_err(|e| async_graphql::Error::new(format!("git diff: {e}")))?;
         if !numstat.status.success() || !name_status.status.success() {
             return Err(async_graphql::Error::new(format!(
                 "git {rev}: {}",
@@ -192,7 +241,8 @@ impl Query {
         }
         let visible = count_visible_lines_per_file(&String::from_utf8_lossy(&full_diff.stdout));
 
-        let mut entries: std::collections::BTreeMap<String, FileEntry> = std::collections::BTreeMap::new();
+        let mut entries: std::collections::BTreeMap<String, FileEntry> =
+            std::collections::BTreeMap::new();
         for line in String::from_utf8_lossy(&numstat.stdout).lines() {
             let mut parts = line.splitn(3, '\t');
             let add = parts.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
@@ -318,11 +368,7 @@ impl Query {
         run_for_each_ref(&repo, &["refs/tags"]).await
     }
 
-    async fn tree(
-        &self,
-        repo: String,
-        rev: Option<String>,
-    ) -> async_graphql::Result<Vec<String>> {
+    async fn tree(&self, repo: String, rev: Option<String>) -> async_graphql::Result<Vec<String>> {
         let rev = rev.unwrap_or_else(|| "HEAD".to_string());
         let output = tokio::process::Command::new("git")
             .current_dir(PathBuf::from(&repo))
@@ -586,7 +632,10 @@ fn parse_diff_git_new_path(rest: &str) -> Option<String> {
     let trimmed = rest.trim_end();
     let idx = trimmed.rfind(" b/")?;
     let raw = &trimmed[idx + 3..];
-    let stripped = raw.strip_prefix('"').and_then(|s| s.strip_suffix('"')).unwrap_or(raw);
+    let stripped = raw
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(raw);
     Some(stripped.to_string())
 }
 
@@ -607,7 +656,6 @@ fn normalize_renamed_path(raw: &str) -> String {
     raw.to_string()
 }
 
-
 pub enum BackendError {
     Internal(String),
     BadRequest(String),
@@ -621,7 +669,12 @@ pub async fn diff_text(
     ignore_ws: bool,
 ) -> Result<Vec<u8>, BackendError> {
     let (subcmd, extra) = diff_extras_for_rev(rev, ignore_ws);
-    let mut args: Vec<String> = vec!["-c".into(), "core.quotePath=false".into(), subcmd.into(), "--no-color".into()];
+    let mut args: Vec<String> = vec![
+        "-c".into(),
+        "core.quotePath=false".into(),
+        subcmd.into(),
+        "--no-color".into(),
+    ];
     args.extend(extra);
     if let Some(p) = path {
         args.push("--".into());
@@ -659,7 +712,9 @@ pub async fn blob_text(rev: &str, repo: &str, path: &str) -> Result<Vec<u8>, Bac
         {
             return Ok(Vec::new());
         }
-        return Err(BackendError::NotFound(format!("git show {target}: {stderr}")));
+        return Err(BackendError::NotFound(format!(
+            "git show {target}: {stderr}"
+        )));
     }
     Ok(output.stdout)
 }
@@ -672,12 +727,10 @@ async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
     let rev = params.rev.unwrap_or_else(|| "HEAD".to_string());
     let ignore_ws = matches!(params.w.as_deref(), Some("1") | Some("true"));
     match diff_text(&rev, &params.repo, params.path.as_deref(), ignore_ws).await {
-        Ok(out) => (
-            [(header::CONTENT_TYPE, "text/x-diff; charset=utf-8")],
-            out,
-        )
-            .into_response(),
-        Err(BackendError::Internal(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Ok(out) => ([(header::CONTENT_TYPE, "text/x-diff; charset=utf-8")], out).into_response(),
+        Err(BackendError::Internal(msg)) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
+        }
         Err(BackendError::BadRequest(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
         Err(BackendError::NotFound(msg)) => (StatusCode::NOT_FOUND, msg).into_response(),
     }
@@ -685,12 +738,10 @@ async fn diff_handler(AxumQuery(params): AxumQuery<DiffParams>) -> Response {
 
 async fn blob_handler(AxumQuery(params): AxumQuery<BlobParams>) -> Response {
     match blob_text(&params.rev, &params.repo, &params.path).await {
-        Ok(out) => (
-            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-            out,
-        )
-            .into_response(),
-        Err(BackendError::Internal(msg)) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        Ok(out) => ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], out).into_response(),
+        Err(BackendError::Internal(msg)) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
+        }
         Err(BackendError::BadRequest(msg)) => (StatusCode::BAD_REQUEST, msg).into_response(),
         Err(BackendError::NotFound(msg)) => (StatusCode::NOT_FOUND, msg).into_response(),
     }
@@ -1022,7 +1073,12 @@ diff --git a/h b/h
         ];
         for diff in diffs {
             for (_, v) in count_visible_lines_per_file(diff) {
-                assert!(v.split <= v.unified, "split ({}) > unified ({})", v.split, v.unified);
+                assert!(
+                    v.split <= v.unified,
+                    "split ({}) > unified ({})",
+                    v.split,
+                    v.unified
+                );
             }
         }
     }

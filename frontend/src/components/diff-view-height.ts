@@ -27,7 +27,7 @@ export function computeWrapperMinHeight({
   return reservedHeight
 }
 
-export type HeightObserver = (cb: (h: number) => void) => () => void
+type HeightObserver = (cb: (h: number) => void) => () => void
 
 export interface UseStableHeightOptions {
   layout: 'unified' | 'split'
