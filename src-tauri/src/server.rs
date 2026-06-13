@@ -13,14 +13,17 @@ use axum::{
 use futures::stream::Stream;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::Match;
-use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
+use notify::{event::CreateKind, Event as FsEvent, EventKind, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
     convert::Infallible,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex, OnceLock,
+    },
     time::Duration,
 };
 use tokio::{net::TcpListener, sync::broadcast};
@@ -871,21 +874,15 @@ impl RepoIgnore {
     }
 }
 
-fn unignored_paths(ig: &RepoIgnore, paths: &[PathBuf]) -> Vec<PathBuf> {
-    paths
-        .iter()
-        .filter(|p| {
-            let s = p.to_string_lossy();
-            if s.contains("/.git/") || s.ends_with("/.git") {
-                return false;
-            }
-            if p.is_dir() {
-                return false;
-            }
-            !ig.is_ignored(p, false)
-        })
-        .cloned()
-        .collect()
+/// True when a changed path is a git-relevant file (not under `.git/`, not a
+/// directory, not gitignored). Cheap enough for the event hot path as long as
+/// the caller bounds how often it is invoked (see the flood guard below).
+fn is_relevant_change(ig: &RepoIgnore, path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    if s.contains("/.git/") || s.ends_with("/.git") {
+        return false;
+    }
+    !path.is_dir() && !ig.is_ignored(path, false)
 }
 
 fn unignored_dirs(root: &Path) -> Vec<PathBuf> {
@@ -900,32 +897,123 @@ fn unignored_dirs(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+/// How long we coalesce filesystem events before emitting a single "changed".
+const WATCH_WINDOW: Duration = Duration::from_secs(2);
+
+/// More than this many raw inotify events inside one window means a watched
+/// directory is being rewritten in a hot loop (a build artifact, log file, or
+/// temp file that slipped past gitignore). The kernel hands every event to the
+/// notify reader thread, so reacting to each one pins a CPU core for no
+/// user-visible benefit — instead we unwatch the offending directory once and
+/// log it. This is the guard against the "sa pegs 240% CPU for hours" runaway.
+const WATCH_FLOOD: u64 = 4000;
+
+/// Past this many events in a window we stop doing per-event gitignore work and
+/// let the flood guard handle it. Keeps the notify reader callback O(1) under a
+/// storm so a single hot file can't burn a core on relevance checks.
+const WATCH_RELEVANCE_BUDGET: u64 = 64;
+
 fn spawn_watcher(tx: broadcast::Sender<String>, root: PathBuf) {
-    let (event_tx, event_rx) = std::sync::mpsc::channel::<Vec<PathBuf>>();
-    let mut debouncer = new_debouncer(Duration::from_secs(3), move |res: DebounceEventResult| {
-        if let Ok(events) = res {
-            let _ = event_tx.send(events.iter().map(|e| e.path.clone()).collect());
+    // Shared, read-only ignore rules. `Gitignore` is Send + Sync so both the
+    // notify reader thread and our emit loop can consult it.
+    let ignore = Arc::new(RepoIgnore::load(&root));
+    // Set by the reader thread when a relevant change is seen; drained once per
+    // window by the emit loop. A flood of events collapses to a single store.
+    let dirty = Arc::new(AtomicBool::new(false));
+    // Raw event tally for the current window, used only by the flood guard.
+    let event_count = Arc::new(AtomicU64::new(0));
+    // A representative path sampled early in each window, so when the flood
+    // guard trips we know which directory to unwatch.
+    let sample = Arc::new(Mutex::new(Option::<PathBuf>::None));
+    // Newly created directories to extend NonRecursive watches onto. Low volume
+    // (only dir-create events), processed off the hot path in the emit loop.
+    let (newdir_tx, newdir_rx) = std::sync::mpsc::channel::<PathBuf>();
+
+    let cb_ignore = ignore.clone();
+    let cb_dirty = dirty.clone();
+    let cb_count = event_count.clone();
+    let cb_sample = sample.clone();
+
+    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<FsEvent>| {
+        let Ok(event) = res else { return };
+        let n = cb_count.fetch_add(1, Ordering::Relaxed);
+
+        if matches!(event.kind, EventKind::Create(CreateKind::Folder)) {
+            for p in &event.paths {
+                let _ = newdir_tx.send(p.clone());
+            }
         }
-    })
-    .expect("failed to create debouncer");
+
+        // Once we've decided to emit this window, or we've already spent the
+        // relevance budget, every further event is a single atomic add above
+        // plus this load — no syscalls, no allocation, no gitignore matching.
+        if cb_dirty.load(Ordering::Relaxed) || n >= WATCH_RELEVANCE_BUDGET {
+            return;
+        }
+
+        if n < 4 {
+            if let (Some(p), Ok(mut s)) = (event.paths.first(), cb_sample.lock()) {
+                *s = Some(p.clone());
+            }
+        }
+
+        if event
+            .paths
+            .iter()
+            .any(|p| is_relevant_change(&cb_ignore, p))
+        {
+            cb_dirty.store(true, Ordering::Relaxed);
+        }
+    }) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("failed to create watcher for {}: {e}", root.display());
+            return;
+        }
+    };
+
     std::thread::spawn(move || {
-        let ignore = RepoIgnore::load(&root);
         let dirs = unignored_dirs(&root);
         eprintln!("watching {} ({} dirs)", root.display(), dirs.len());
-        for dir in dirs {
-            if let Err(e) = debouncer.watcher().watch(&dir, RecursiveMode::NonRecursive) {
+        for dir in &dirs {
+            if let Err(e) = watcher.watch(dir, RecursiveMode::NonRecursive) {
                 eprintln!("watch failed for {}: {e}", dir.display());
             }
         }
-        while let Ok(paths) = event_rx.recv() {
-            for path in &paths {
-                if path.is_dir() && !ignore.is_ignored(path, true) {
-                    for dir in unignored_dirs(path) {
-                        let _ = debouncer.watcher().watch(&dir, RecursiveMode::NonRecursive);
+
+        loop {
+            std::thread::sleep(WATCH_WINDOW);
+
+            // Extend watches onto directories created since the last window.
+            while let Ok(p) = newdir_rx.try_recv() {
+                if p.is_dir() && !ignore.is_ignored(&p, true) {
+                    for d in unignored_dirs(&p) {
+                        let _ = watcher.watch(&d, RecursiveMode::NonRecursive);
                     }
                 }
             }
-            if !unignored_paths(&ignore, &paths).is_empty() {
+
+            let count = event_count.swap(0, Ordering::Relaxed);
+            if count >= WATCH_FLOOD {
+                let culprit = sample.lock().ok().and_then(|mut s| s.take());
+                let dir = culprit.and_then(|p| {
+                    if p.is_dir() {
+                        Some(p)
+                    } else {
+                        p.parent().map(Path::to_owned)
+                    }
+                });
+                if let Some(dir) = dir {
+                    let _ = watcher.unwatch(&dir);
+                    eprintln!(
+                        "watch flood: {count} events in {}s from {}; unwatched to protect CPU",
+                        WATCH_WINDOW.as_secs(),
+                        dir.display()
+                    );
+                }
+            }
+
+            if dirty.swap(false, Ordering::Relaxed) {
                 let _ = tx.send("changed".to_string());
             }
         }
