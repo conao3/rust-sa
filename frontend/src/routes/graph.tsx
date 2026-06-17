@@ -5,6 +5,7 @@ import {
   RefsDocument,
   type CommitsQuery,
 } from '#/graphql/generated/graphql'
+import { isDeepActiveInput } from '#/lib/deep-active-input'
 import { useHotkeys } from '@tanstack/react-hotkeys'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { GitStatusEntry } from '@pierre/trees'
@@ -158,7 +159,10 @@ function GraphPage() {
   useHotkeys(
     [
       { hotkey: { key: '/', shift: true }, callback: () => setHelpOpen((o) => !o) },
-      { hotkey: 'S', callback: () => setMode(mode === 'unified' ? 'split' : 'unified') },
+      {
+        hotkey: 'S',
+        callback: () => !isDeepActiveInput() && setMode(mode === 'unified' ? 'split' : 'unified'),
+      },
     ],
     { preventDefault: true, ignoreInputs: true },
   )

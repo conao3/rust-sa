@@ -11,6 +11,7 @@ import { useHotkeys } from '@tanstack/react-hotkeys'
 import { FilesDocument, type FilesQuery } from '#/graphql/generated/graphql'
 import { shortSha } from '#/lib/short-sha'
 import { useComments } from '#/lib/comments'
+import { isDeepActiveInput } from '#/lib/deep-active-input'
 import { usePreference, useRootAttribute } from '#/lib/preference'
 import { useThemePreference } from '#/lib/server-preference'
 import { useEvents } from '#/lib/sse'
@@ -164,15 +165,28 @@ function ComparePage() {
   useHotkeys(
     [
       { hotkey: { key: '/', shift: true }, callback: () => setHelpOpen((o) => !o) },
-      { hotkey: 'S', callback: () => setMode(mode === 'unified' ? 'split' : 'unified') },
-      { hotkey: '.', callback: () => setDensity(nextDensity(density)) },
-      { hotkey: 'V', callback: () => currentPath && toggle(currentPath) },
+      {
+        hotkey: 'S',
+        callback: () => !isDeepActiveInput() && setMode(mode === 'unified' ? 'split' : 'unified'),
+      },
+      { hotkey: '.', callback: () => !isDeepActiveInput() && setDensity(nextDensity(density)) },
+      { hotkey: 'V', callback: () => !isDeepActiveInput() && currentPath && toggle(currentPath) },
       {
         hotkey: ']',
-        callback: () => paths.length && setFocusedIndex((i) => Math.min(i + 1, paths.length - 1)),
+        callback: () =>
+          !isDeepActiveInput() &&
+          paths.length &&
+          setFocusedIndex((i) => Math.min(i + 1, paths.length - 1)),
       },
-      { hotkey: '[', callback: () => paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)) },
-      { hotkey: 'G', callback: () => navigate({ to: '/graph', search: { repo } }) },
+      {
+        hotkey: '[',
+        callback: () =>
+          !isDeepActiveInput() && paths.length && setFocusedIndex((i) => Math.max(i - 1, 0)),
+      },
+      {
+        hotkey: 'G',
+        callback: () => !isDeepActiveInput() && navigate({ to: '/graph', search: { repo } }),
+      },
     ],
     { preventDefault: true, ignoreInputs: true },
   )
