@@ -24,7 +24,7 @@
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
-    "@tanstack/router-plugin": "^1.168.1",
+    "@tanstack/router-plugin": "^1.168.18",
     "@tauri-apps/api": "^2.11.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "clsx": "^2.1.1",
@@ -57,7 +57,9 @@
     "oxlint": "^1.65.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.13",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "youch": "^4.1.1",
+    "youch-core": "^0.3.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
