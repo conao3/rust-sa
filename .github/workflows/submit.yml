@@ -92,6 +92,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: frontend
+      - run: make -C frontend codegen
       - run: make dist
       - uses: actions/cache@v4
         with:
