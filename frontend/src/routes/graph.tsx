@@ -413,6 +413,7 @@ function GraphPage() {
                     ? (head as SpecialId)
                     : null
               }
+              isRange={!!head}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -459,6 +460,7 @@ function DiffPreview({
   refreshKey,
   commit,
   special,
+  isRange,
 }: {
   rev: string
   repo: string
@@ -467,6 +469,7 @@ function DiffPreview({
   refreshKey: number
   commit: Commit | null
   special: SpecialId | null
+  isRange: boolean
 }) {
   const [treeWStr, setTreeWStr] = usePreference<string>('rust-sa:graph-tree-w', '280')
   const treeW = Number(treeWStr) || 280
@@ -544,7 +547,7 @@ function DiffPreview({
       />
       <div className="overflow-y-auto min-w-0">
         {special && <SpecialMeta special={special} />}
-        <CommitMeta commit={commit} />
+        {!isRange && commit && <CommitMeta commit={commit} />}
         {body}
       </div>
     </div>
