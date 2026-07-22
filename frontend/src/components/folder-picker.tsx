@@ -1,6 +1,6 @@
 import { useQuery } from '#/lib/typed-query'
-import { ArrowUp, Check, File, Folder, GitBranch, Home, Search, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowLeft, ArrowUp, Check, File, Folder, GitBranch, Home, Search, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ListDirDocument } from '#/graphql/generated/graphql'
 import {
   Button as AriaButton,
@@ -21,8 +21,49 @@ export interface FolderPickerProps extends Omit<ModalOverlayProps, 'children'> {
   initialPath?: string | null
 }
 
+const PICKER_STATE_KEY = 'folderPickerCwd'
+
 export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps) {
-  const [cwd, setCwd] = useState<string | null>(initialPath ?? null)
+  const { isOpen, onOpenChange } = rest
+  const [cwd, setCwdRaw] = useState<string | null>(initialPath ?? null)
+  const depthRef = useRef(0)
+  const suppressPopRef = useRef(false)
+
+  const setCwd = useCallback((next: string | null) => {
+    setCwdRaw(next)
+    window.history.pushState({ [PICKER_STATE_KEY]: next }, '')
+    depthRef.current++
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e: PopStateEvent) => {
+      if (suppressPopRef.current) return
+      if (e.state && PICKER_STATE_KEY in e.state) {
+        setCwdRaw(e.state[PICKER_STATE_KEY])
+        depthRef.current = Math.max(0, depthRef.current - 1)
+      } else {
+        depthRef.current = 0
+        onOpenChange?.(false)
+      }
+    }
+    window.addEventListener('popstate', handler)
+    return () => window.removeEventListener('popstate', handler)
+  }, [isOpen, onOpenChange])
+
+  const cleanupHistory = useCallback(() => {
+    if (depthRef.current > 0) {
+      suppressPopRef.current = true
+      window.history.go(-depthRef.current)
+      const restore = () => {
+        suppressPopRef.current = false
+        window.removeEventListener('popstate', restore)
+      }
+      window.addEventListener('popstate', restore)
+      depthRef.current = 0
+    }
+  }, [])
+
   const [showHidden, setShowHidden] = useState(false)
   const [query, setQuery] = useState('')
   const { data, loading, error } = useQuery(ListDirDocument, {
@@ -43,7 +84,10 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
     setQuery('')
   }, [cwd])
 
-  const close = () => rest.onOpenChange?.(false)
+  const close = () => {
+    cleanupHistory()
+    onOpenChange?.(false)
+  }
 
   const enter = (name: string) => {
     if (!listing) return
@@ -128,8 +172,9 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
                         if (!listing) return
                         const next =
                           listing.path === '/' ? `/${e.name}` : `${listing.path}/${e.name}`
+                        cleanupHistory()
                         onPick(next)
-                        close()
+                        onOpenChange?.(false)
                       }
                     : undefined
                 }
@@ -140,6 +185,15 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
             )}
           </div>
           <div className="border-t border-hairline px-5 py-3 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => window.history.back()}
+              isDisabled={depthRef.current === 0}
+            >
+              <ArrowLeft size={16} aria-hidden="true" />
+              back
+            </Button>
             <span className="font-mono text-xs text-mute truncate flex-1">
               {listing?.path ?? '—'}
             </span>
@@ -152,8 +206,9 @@ export function FolderPicker({ onPick, initialPath, ...rest }: FolderPickerProps
               size="sm"
               onPress={() => {
                 if (listing?.path) {
+                  cleanupHistory()
                   onPick(listing.path)
-                  close()
+                  onOpenChange?.(false)
                 }
               }}
               isDisabled={!listing?.path}
