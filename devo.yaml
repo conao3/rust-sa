@@ -1,12 +1,8 @@
 session: rust-sa${SLUG:+-$SLUG}
 
 inherit_env:
-  - PROJECT_ROOT
-  - FLAKE_REF
   - RUST_LOG
   - SLUG
-
-hook_session_closed: "cd ${PROJECT_ROOT:-$PWD} && nix run ${FLAKE_REF:-.}#dev-stop"
 
 tasks:
   - id: backend
