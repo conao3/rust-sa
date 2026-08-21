@@ -125,7 +125,6 @@ function BrowsePage() {
           {!loading && !error && (
             <FileTreeView
               paths={paths}
-              search
               initialExpansion="closed"
               onSelectionChange={(sel) => {
                 if (sel[0] && sel[0] !== selectedPath) selectPath(sel[0])
