@@ -80,6 +80,8 @@
   --crimson-strong: rgba(168, 58, 58, 0.22);
   --amber: #6e521f;
   --amber-soft: rgba(183, 131, 56, 0.14);
+  --hit: rgba(183, 131, 56, 0.4);
+  --hit-active: #b78338;
 
   --syn-keyword: #c08a4a;
   --syn-string: #8aa074;
@@ -136,6 +138,8 @@
   --crimson-strong: rgba(168, 58, 58, 0.32);
   --rust-soft: rgba(204, 120, 92, 0.16);
   --amber-soft: rgba(199, 153, 76, 0.18);
+  --hit: rgba(199, 153, 76, 0.42);
+  --hit-active: #d9a85a;
 }
 
 html,

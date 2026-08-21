@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '#/lib/typed-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { DiffView } from '#/components/diff-view'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { DiffView, type DiffSearchState } from '#/components/diff-view'
 import { FileTreeView } from '#/components/file-tree-view'
 import { HelpSheet } from '#/components/help-sheet'
 import { LiveToast } from '#/components/live-toast'
@@ -45,6 +45,8 @@ interface CompareSearch {
   repo?: string
   w?: boolean
   patch?: string
+  q?: string
+  hit?: number
 }
 
 function parseSpec(spec: string): { base: string; head: string; separator: '··' | '···' | null } {
@@ -75,6 +77,11 @@ export const Route = createFileRoute('/compare/$')({
     repo: typeof search.repo === 'string' ? search.repo : undefined,
     w: search.w === '1' || search.w === 1 || search.w === true ? true : undefined,
     patch: typeof search.patch === 'string' ? search.patch : undefined,
+    q: typeof search.q === 'string' && search.q !== '' ? search.q : undefined,
+    hit:
+      Number.isInteger(Number(search.hit)) && Number(search.hit) > 1
+        ? Number(search.hit)
+        : undefined,
   }),
   loaderDeps: ({ search }) => ({ repo: search.repo, w: search.w, patch: search.patch }),
   loader: async ({ params, deps }): Promise<LoaderData> => {
@@ -121,6 +128,28 @@ function ComparePage() {
       replace: true,
     })
   }
+  const { q, hit } = Route.useSearch()
+  const diffSearch = useMemo<DiffSearchState>(
+    () => ({ query: q ?? '', hit: (hit ?? 1) - 1 }),
+    [q, hit],
+  )
+  const onDiffSearchChange = useCallback(
+    (next: DiffSearchState) => {
+      navigate({
+        to: '/compare/$',
+        params: { _splat: rev },
+        search: (prev) =>
+          ({
+            ...prev,
+            q: next.query || undefined,
+            hit: next.query && next.hit > 0 ? next.hit + 1 : undefined,
+          }) as CompareSearch,
+        replace: true,
+        resetScroll: false,
+      })
+    },
+    [navigate, rev],
+  )
 
   const onViewChange = (next: View) => {
     if (next === 'graph' && repo) navigate({ to: '/graph', search: { repo } })
@@ -301,6 +330,8 @@ function ComparePage() {
             ignoreWhitespace={w}
             treeJumpPath={treeJump?.path}
             treeJumpSeq={treeJump?.seq ?? 0}
+            search={diffSearch}
+            onSearchChange={onDiffSearchChange}
           />
         </main>
       </div>

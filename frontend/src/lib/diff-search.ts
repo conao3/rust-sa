@@ -4,10 +4,11 @@ export interface DiffSearchFile {
 
 export interface DiffSearchHit {
   id: string
-  kind: 'path' | 'line'
   path: string
   rowIndex: number
   preview: string
+  text: string
+  ordinal: number
 }
 
 export function buildDiffSearchHits(
@@ -19,27 +20,25 @@ export function buildDiffSearchHits(
   if (!needle) return []
   const hits: DiffSearchHit[] = []
   for (const file of files) {
-    if (file.path.toLowerCase().includes(needle)) {
-      hits.push({
-        id: `${file.path}:path`,
-        kind: 'path',
-        path: file.path,
-        rowIndex: 0,
-        preview: file.path,
-      })
-    }
     const patch = patches.get(file.path)
     if (!patch) continue
     const lines = patch.split('\n')
+    const seen = new Map<string, number>()
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i] ?? ''
-      if (line.toLowerCase().includes(needle)) {
+      const isContent = /^[ +-]/.test(line) && !line.startsWith('+++') && !line.startsWith('---')
+      if (!isContent) continue
+      const text = line.slice(1).trimEnd()
+      const ordinal = seen.get(text) ?? 0
+      seen.set(text, ordinal + 1)
+      if (text.toLowerCase().includes(needle)) {
         hits.push({
           id: `${file.path}:line:${i}`,
-          kind: 'line',
           path: file.path,
           rowIndex: i,
           preview: line.trim() || line,
+          text,
+          ordinal,
         })
       }
     }

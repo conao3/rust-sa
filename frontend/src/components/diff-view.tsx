@@ -17,6 +17,12 @@ import { computeWrapperMinHeight, useStableHeight } from '#/components/diff-view
 import { ViewedCheck } from '#/components/ui/viewed-check'
 import type { Comment, Side } from '#/lib/comments'
 import { buildDiffSearchHits, type DiffSearchHit } from '#/lib/diff-search'
+import {
+  SEARCH_HIGHLIGHT_CSS,
+  clearSearchHighlights,
+  collectMatchRanges,
+  setSearchHighlights,
+} from '#/lib/search-highlight'
 import { useDiff, useFileBlobs } from '#/lib/diff-api'
 import { observeHeight, observeInView } from '#/lib/observer-pool'
 
@@ -67,6 +73,19 @@ export interface DiffViewProps {
   ignoreWhitespace?: boolean
   treeJumpPath?: string
   treeJumpSeq?: number
+  search?: DiffSearchState
+  onSearchChange?: (next: DiffSearchState) => void
+}
+
+export interface DiffSearchState {
+  query: string
+  hit: number
+}
+
+const EMPTY_SEARCH: DiffSearchState = { query: '', hit: 0 }
+
+function sameSearch(a: DiffSearchState, b: DiffSearchState): boolean {
+  return a.query === b.query && a.hit === b.hit
 }
 
 export function DiffView({
@@ -87,15 +106,39 @@ export function DiffView({
   ignoreWhitespace,
   treeJumpPath,
   treeJumpSeq = 0,
+  search,
+  onSearchChange,
 }: DiffViewProps) {
   const patchMapRef = useRef(new Map<string, string>())
   const [patchVersion, setPatchVersion] = useState(0)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeHitIndex, setActiveHitIndex] = useState(0)
+  const [searchState, setSearchState] = useState<DiffSearchState>(search ?? EMPTY_SEARCH)
+  const searchQuery = searchState.query
+  const activeHitIndex = searchState.hit
+  const lastSyncedSearchRef = useRef<DiffSearchState>(search ?? EMPTY_SEARCH)
+  const updateSearch = useCallback(
+    (updater: (prev: DiffSearchState) => DiffSearchState) =>
+      setSearchState((prev) => {
+        const next = updater(prev)
+        return sameSearch(prev, next) ? prev : next
+      }),
+    [],
+  )
+  useEffect(() => {
+    if (!onSearchChange || sameSearch(lastSyncedSearchRef.current, searchState)) return
+    lastSyncedSearchRef.current = searchState
+    onSearchChange(searchState)
+  }, [onSearchChange, searchState])
+  useEffect(() => {
+    if (!search || sameSearch(search, lastSyncedSearchRef.current)) return
+    lastSyncedSearchRef.current = search
+    setSearchState(search)
+  }, [search])
+  const [searchOpen, setSearchOpen] = useState(searchQuery !== '')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
-  const [loadAllPatches, setLoadAllPatches] = useState(files.length <= INITIAL_PATCH_FILE_LIMIT)
+  const [loadAllPatches, setLoadAllPatches] = useState(
+    files.length <= INITIAL_PATCH_FILE_LIMIT || searchQuery !== '',
+  )
   const registerPatch = useCallback((path: string, patchText: string | null) => {
     const prev = patchMapRef.current.get(path)
     if (patchText == null) {
@@ -106,9 +149,13 @@ export function DiffView({
     patchMapRef.current.set(path, patchText)
     setPatchVersion((v) => v + 1)
   }, [])
-  const hits = useMemo(() => {
+  const { hits, hitsComplete } = useMemo(() => {
     void patchVersion
-    return buildDiffSearchHits(files, patchMapRef.current, searchQuery)
+    const patches = patchMapRef.current
+    return {
+      hits: buildDiffSearchHits(files, patches, searchQuery),
+      hitsComplete: files.every((f) => patches.has(f.path)),
+    }
   }, [files, patchVersion, searchQuery])
   const activeHit = hits[activeHitIndex]
   const openSearch = useCallback(() => {
@@ -127,15 +174,27 @@ export function DiffView({
   }, [])
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
+    updateSearch(() => EMPTY_SEARCH)
     window.requestAnimationFrame(() => restoreFocusRef.current?.focus())
-  }, [])
+  }, [updateSearch])
+  const setQuery = useCallback(
+    (query: string) => updateSearch(() => ({ query, hit: 0 })),
+    [updateSearch],
+  )
   const moveHit = useCallback(
     (delta: number) => {
       if (hits.length === 0) return
-      setActiveHitIndex((i) => (i + delta + hits.length) % hits.length)
+      updateSearch((prev) => ({
+        query: prev.query,
+        hit: (prev.hit + delta + hits.length) % hits.length,
+      }))
     },
-    [hits.length],
+    [hits.length, updateSearch],
   )
+
+  useEffect(() => {
+    if (searchQuery !== '') setSearchOpen(true)
+  }, [searchQuery])
 
   useEffect(() => {
     if (!searchOpen) return
@@ -146,14 +205,11 @@ export function DiffView({
   }, [searchOpen])
 
   useEffect(() => {
-    setActiveHitIndex(0)
-  }, [searchQuery])
-
-  useEffect(() => {
-    if (activeHitIndex >= hits.length) {
-      setActiveHitIndex(Math.max(0, hits.length - 1))
-    }
-  }, [activeHitIndex, hits.length])
+    if (!hitsComplete || hits.length === 0) return
+    updateSearch((prev) =>
+      prev.hit >= hits.length ? { query: prev.query, hit: hits.length - 1 } : prev,
+    )
+  }, [hits.length, hitsComplete, updateSearch])
 
   useHotkeys([{ hotkey: 'Mod+F', callback: openSearch }], {
     preventDefault: true,
@@ -172,7 +228,7 @@ export function DiffView({
       {searchOpen && (
         <DiffSearchPanel
           query={searchQuery}
-          onQueryChange={setSearchQuery}
+          onQueryChange={setQuery}
           inputRef={searchInputRef}
           active={hits.length > 0 ? activeHitIndex + 1 : 0}
           total={hits.length}
@@ -206,6 +262,7 @@ export function DiffView({
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
           ignoreWhitespace={ignoreWhitespace}
+          searchQuery={searchQuery}
           activeSearchHit={activeHit?.path === f.path ? activeHit : undefined}
           treeJumpSeq={treeJumpPath === f.path ? treeJumpSeq : 0}
           onPatchChange={registerPatch}
@@ -295,7 +352,7 @@ function DiffSearchPanel({
         <div className="border-t border-hairline-soft px-3 py-2 font-mono text-xs text-mute truncate">
           <span className="text-ink">{activeHit.path}</span>
           <span className="px-1">·</span>
-          <span>{activeHit.kind === 'path' ? 'path' : `line ${activeHit.rowIndex + 1}`}</span>
+          <span>line {activeHit.rowIndex + 1}</span>
         </div>
       )}
     </div>
@@ -324,6 +381,7 @@ interface FileBlockProps {
   onAddComment?: (input: AddCommentInput) => void
   onDeleteComment?: (id: string) => void
   ignoreWhitespace?: boolean
+  searchQuery: string
   activeSearchHit?: DiffSearchHit
   treeJumpSeq?: number
   onPatchChange?: (path: string, patch: string | null) => void
@@ -357,6 +415,7 @@ function FileBlock({
   onAddComment,
   onDeleteComment,
   ignoreWhitespace,
+  searchQuery,
   activeSearchHit,
   treeJumpSeq,
   onPatchChange,
@@ -438,18 +497,91 @@ function FileBlock({
     setInRange(true)
   }, [activeSearchHit, onToggleViewed, viewed])
 
-  const searchJumpDoneRef = useRef<DiffSearchHit | null>(null)
+  const searchJumpDoneRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!activeSearchHit || activeSearchHit === searchJumpDoneRef.current) return
+    if (!activeSearchHit || activeSearchHit.id === searchJumpDoneRef.current) return
     const el = containerRef.current
     if (!el) return
     const jump = () => {
-      searchJumpDoneRef.current = activeSearchHit
+      if (activeSearchHit.id === searchJumpDoneRef.current) return
+      searchJumpDoneRef.current = activeSearchHit.id
       scrollFileBlockIntoView(el, activeSearchHit.rowIndex)
     }
     const id = window.setTimeout(jump, inRange && !collapsed ? 30 : 80)
     return () => window.clearTimeout(id)
   }, [activeSearchHit, collapsed, inRange])
+
+  const needle = searchQuery.trim()
+  useEffect(() => {
+    if (!needle || collapsed || loading || error || !inRange) {
+      clearSearchHighlights(path)
+      return
+    }
+    const wrapper = containerRef.current
+    if (!wrapper) return
+    const activeLineHit = activeSearchHit
+    const shadowRootOf = () => wrapper.querySelector('diffs-container')?.shadowRoot ?? null
+    const apply = () => {
+      const root = shadowRootOf()
+      if (!root) {
+        clearSearchHighlights(path)
+        return
+      }
+      const lines = root.querySelectorAll('[data-line][data-line-index]')
+      let activeLine: Element | null = null
+      if (activeLineHit) {
+        let seen = 0
+        for (const line of lines) {
+          if ((line.textContent ?? '').trimEnd() !== activeLineHit.text) continue
+          if (seen === activeLineHit.ordinal) {
+            activeLine = line
+            break
+          }
+          seen += 1
+        }
+        if (activeLine && searchJumpDoneRef.current !== activeLineHit.id) {
+          searchJumpDoneRef.current = activeLineHit.id
+          activeLine.scrollIntoView({ block: 'center' })
+        }
+      }
+      const all: Range[] = []
+      const active: Range[] = []
+      for (const line of lines) {
+        const ranges = collectMatchRanges(line, needle)
+        if (line === activeLine) active.push(...ranges)
+        else all.push(...ranges)
+      }
+      setSearchHighlights(path, all, active)
+    }
+    let raf = 0
+    const schedule = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        apply()
+      })
+    }
+    const inner = new MutationObserver(schedule)
+    let observedRoot: ShadowRoot | null = null
+    const sync = () => {
+      const root = shadowRootOf()
+      if (root !== observedRoot) {
+        inner.disconnect()
+        observedRoot = root
+        if (root) inner.observe(root, { childList: true, subtree: true, characterData: true })
+      }
+      schedule()
+    }
+    const outer = new MutationObserver(sync)
+    outer.observe(wrapper, { childList: true, subtree: true })
+    sync()
+    return () => {
+      inner.disconnect()
+      outer.disconnect()
+      if (raf) window.cancelAnimationFrame(raf)
+      clearSearchHighlights(path)
+    }
+  }, [needle, activeSearchHit, collapsed, loading, error, inRange, path, patch, layout, theme])
 
   const treeJumpDoneRef = useRef(0)
   useEffect(() => {
@@ -497,7 +629,7 @@ function FileBlock({
 
   useEffect(() => {
     if (loading || error || collapsed) return
-    const sheet = getDiffsScrollbarSheet()
+    const sheet = getDiffsSheet()
     if (!sheet) return
     const wrapper = containerRef.current
     if (!wrapper) return
@@ -509,13 +641,13 @@ function FileBlock({
       root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]
       return true
     }
-    if (adopt()) return
     // pierre's <PatchDiff> may attach its shadow root in a follow-up tick
-    // after React commits. Replace the prior 100 ms polling loop with a
-    // single MutationObserver that fires the moment the container appears
-    // (or its shadow root mutates), then disconnects.
+    // after React commits, and the block swaps to a fresh <diffs-container>
+    // once blobs arrive and <FileDiff> takes over, so keep the observer
+    // alive and re-adopt whenever a new shadow root shows up.
+    adopt()
     const mo = new MutationObserver(() => {
-      if (adopt()) mo.disconnect()
+      adopt()
     })
     mo.observe(wrapper, { childList: true, subtree: true })
     return () => mo.disconnect()
@@ -694,7 +826,7 @@ function FileBlock({
       </div>
       {isActiveSearchHit && (
         <div className="px-3 py-1.5 border-b border-amber bg-amber-soft font-mono text-xs text-amber">
-          {activeSearchHit.kind === 'path' ? 'path' : `line ${activeSearchHit.rowIndex + 1}`} ·{' '}
+          line {activeSearchHit.rowIndex + 1} ·{' '}
           <span className="text-ink">{activeSearchHit.preview}</span>
         </div>
       )}
@@ -777,10 +909,10 @@ const INITIAL_PATCH_FILE_LIMIT = 20
 // drag every diff into memory at once.
 const DIFF_VIEWPORT_MARGIN: IntersectionObserverInit = { rootMargin: '5000px 0px' }
 
-let diffsScrollbarSheetCache: CSSStyleSheet | null = null
-function getDiffsScrollbarSheet(): CSSStyleSheet | null {
+let diffsSheetCache: CSSStyleSheet | null = null
+function getDiffsSheet(): CSSStyleSheet | null {
   if (typeof CSSStyleSheet === 'undefined') return null
-  if (diffsScrollbarSheetCache) return diffsScrollbarSheetCache
+  if (diffsSheetCache) return diffsSheetCache
   const sheet = new CSSStyleSheet()
   sheet.replaceSync(`
     [data-code]{scrollbar-width:thin;scrollbar-color:var(--hairline) transparent;}
@@ -790,8 +922,9 @@ function getDiffsScrollbarSheet(): CSSStyleSheet | null {
     [data-code]:hover::-webkit-scrollbar-thumb,
     :is([data-diff],[data-file]):hover [data-code]::-webkit-scrollbar-thumb{background-color:var(--faint);}
     [data-code]::-webkit-scrollbar-corner{background:transparent;}
+    ${SEARCH_HIGHLIGHT_CSS}
   `)
-  diffsScrollbarSheetCache = sheet
+  diffsSheetCache = sheet
   return sheet
 }
 
