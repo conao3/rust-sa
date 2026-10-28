@@ -1,20 +1,20 @@
 use async_graphql::{EmptySubscription, InputObject, Object, Schema, SimpleObject};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
+    Extension, Router,
     body::Body,
     extract::Query as AxumQuery,
-    http::{header, StatusCode, Uri},
+    http::{StatusCode, Uri, header},
     response::{
-        sse::{Event, KeepAlive, Sse},
         IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
     },
     routing::{get, post},
-    Extension, Router,
 };
 use futures::stream::Stream;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::Match;
-use notify::{event::CreateKind, Event as FsEvent, EventKind, RecursiveMode, Watcher};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use notify::{Event as FsEvent, EventKind, RecursiveMode, Watcher, event::CreateKind};
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use std::{
@@ -24,8 +24,8 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex, OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -34,7 +34,7 @@ use tokio::{
     net::TcpListener,
     sync::broadcast,
 };
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -159,7 +159,7 @@ fn load_preferences() -> Preferences {
         Err(_) => {
             return Preferences {
                 theme: "light".into(),
-            }
+            };
         }
     };
     let mut prefs: Preferences = toml::from_str(&raw).unwrap_or_default();
