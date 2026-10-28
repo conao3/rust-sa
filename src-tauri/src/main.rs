@@ -9,10 +9,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::path::PathBuf;
 
 #[cfg(feature = "desktop")]
-use tauri::{ipc::Channel, AppHandle, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, State, WebviewUrl, WebviewWindowBuilder, ipc::Channel};
 
 #[cfg(feature = "desktop")]
-use conao3_sa::server::{blob_text, diff_text, watcher_for, AppSchema, BackendError};
+use conao3_sa::server::{AppSchema, BackendError, blob_text, diff_text, watcher_for};
 
 #[cfg(feature = "desktop")]
 #[tauri::command]
