@@ -27,8 +27,8 @@
           overlay =
             final: prev:
             let
-              nodejs = prev.nodejs_24;
-              pnpm = prev.pnpm_10.override { inherit nodejs; };
+              nodejs = prev.nodejs_latest;
+              pnpm = prev.pnpm.override { nodejs-slim = nodejs; };
             in
             {
               inherit
@@ -112,8 +112,8 @@
                 ;
               pnpm = pkgs.pnpm;
               postPatch = "cd ${finalAttrs.pnpmRoot}";
-              fetcherVersion = 3;
-              hash = "sha256-f+zk+I3UWP1kbmA1p9ZW1woigdi+UBTc08UtH91eptU=";
+              fetcherVersion = 4;
+              hash = "sha256-pxHgN1Zo9l18lFklB7LtK4FswglklCCamSFeYfk6tVQ=";
             };
 
             nativeBuildInputs =
