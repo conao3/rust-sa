@@ -1,0 +1,7 @@
+onlyBuiltDependencies:
+  - esbuild
+  - lightningcss
+overrides:
+  seroval: ^1.6.3
+  postcss-selector-parser: ^7.1.6
+  tinypool: ^2.1.2
