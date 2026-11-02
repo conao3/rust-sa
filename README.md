@@ -32,12 +32,16 @@ cargo install conao3-sa
 
 One executable lands in `~/.cargo/bin`:
 
-| Command       | What it does                                                                  |
-| ------------- | ----------------------------------------------------------------------------- |
-| `sa`          | Tauri desktop shell that starts the axum backend in-process and opens a WebView. |
-| `sa <spec>`   | Headless axum backend, browser open at `/compare/<spec>?repo=<cwd repo>`.      |
-| `sa -`        | Headless axum backend, browser open at `/compare/stdin?patch=<id>` for stdin unified diff. |
-| `sa --serve`  | Headless axum backend with `/api/*` and embedded SPA static serving.            |
+| Command                              | What it does                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| `sa desktop start-app`               | Tauri desktop shell with the embedded SPA in a WebView.                           |
+| `sa diff open-review --spec <spec>`  | Headless backend, browser open at `/compare/<spec>?repo=<cwd repo>`.              |
+| `sa diff open-review --patch <diff>` | Headless backend, browser open at `/compare/stdin?patch=<id>` for a unified diff. |
+| `sa server start-server`             | Headless backend with `/api/*` and embedded SPA static serving.                   |
+| `sa schema get-graphql-schema`       | GraphQL SDL of the backend.                                                       |
+
+`sa` without arguments starts the desktop shell, which is how OS
+launchers (`.app`, `.desktop`) start the bundle.
 
 The published crate **bundles a pre-built SPA**, so `sa` works out of
 the box without a Node/pnpm toolchain on the host.
@@ -69,30 +73,63 @@ it on first run.
 
 ### Launching
 
+`sa` takes its input in the AWS CLI grammar:
+`sa [global options] <command> <subcommand> [--parameter value ...]`.
+
 ```bash
-# Desktop UI. The shell starts the backend in a side thread, then opens
-# the WebView pointed at the embedded SPA.
-sa
+# Desktop UI. The WebView loads the embedded SPA and talks to the
+# backend over Tauri IPC.
+sa desktop start-app
 
 # CLI diff review for the current git repository. The backend binds to
 # 127.0.0.1 on a dynamic port and opens the system browser.
-sa HEAD~3...HEAD
-sa working
-sa staging
-git diff | sa -
-sa --no-open --port 7777 working
+sa diff open-review --spec HEAD~3...HEAD
+sa diff open-review --spec working
+sa diff open-review --spec staging
+git diff | sa diff open-review --patch file:///dev/stdin
+sa diff open-review --spec working --no-open --port 7777
 
 # Headless backend with embedded SPA static serving.
-sa --serve
-sa --serve --port 7777
+sa server start-server
+sa server start-server --port 7777
+sa --output text --query GraphqlUrl server start-server
+
+# GraphQL SDL (frontend/schema.graphql is generated with this).
+sa --output text schema get-graphql-schema
 ```
 
-`--port <port>` binds the headless server to a specific localhost port.
-When `--port` and `PORT` are both unset, the OS assigns a dynamic port.
-`--no-open` keeps CLI diff review from launching the system browser and
-prints the `/compare/<spec>` URL. The startup log prints the bound
-GraphQL, diff, blob, and SSE URLs. `PORTLESS_URL` rewrites the printed
-URLs for portless-based dev sessions.
+Parameters:
+
+- `--spec <string>`: any git rev, range, or the pseudos `working` /
+  `staging` (see `/compare/$spec` below).
+- `--patch <string>`: a unified diff. `file:///dev/stdin` reads it from
+  stdin. `--spec` and `--patch` are mutually exclusive.
+- `--port <integer>`: binds the headless server to a specific localhost
+  port. When `--port` and `PORT` are both unset, the OS assigns a dynamic
+  port.
+- `--open` / `--no-open`: launch the system browser for the review URL
+  (default `--open`).
+
+Common rules:
+
+- Global options: `--output json|text|table` (default `json`),
+  `--query <JMESPath>`, `--debug` (argv and parsed parameters to stderr),
+  `--version`.
+- `help` works at every level: `sa help`, `sa diff help`,
+  `sa diff open-review help`.
+- A value starting with `file://` is read from that file.
+- `--cli-input-json <json>` passes all parameters as JSON keyed by the
+  PascalCase parameter name (`{"Spec": "HEAD~1..HEAD", "Open": false}`);
+  parameters on the command line take precedence.
+  `--generate-cli-skeleton input|output` prints the input or output
+  skeleton.
+- Output keys are PascalCase. `server start-server` prints `BaseUrl`,
+  `GraphqlUrl`, `DiffUrl`, `BlobUrl`, `EventsUrl` once the port is bound;
+  `diff open-review` adds `ReviewUrl` and `BrowserOpened`. `PORTLESS_URL`
+  rewrites `BaseUrl` and the API URLs for portless-based dev sessions.
+- Exit codes: `0` success, `252` command syntax or parameter error, `254`
+  error on the target side (not a git repository), `255` any other
+  failure (port already in use).
 
 The first time you launch the desktop UI, you'll be on `/` — point it
 at any local repo via the folder picker and you'll land in `/browse`.
@@ -129,8 +166,9 @@ state live in browser `localStorage`.
 
 ```
 src-tauri/      Rust backend (axum + GraphQL + git CLI)
-  src/main.rs        Tauri shell (executable: sa)
-  src/server.rs      axum + GraphQL backend (also reachable via `sa --serve`)
+  src/main.rs        CLI entry and Tauri shell (executable: sa)
+  src/cli.rs         CLI grammar (clap), output formats, cli-input-json
+  src/server.rs      axum + GraphQL backend (also reachable via `sa server start-server`)
 frontend/       TanStack Start frontend
   src/routes/   __root, /, /browse, /compare/$, /graph, /preference, /design, /health
   src/components, src/lib

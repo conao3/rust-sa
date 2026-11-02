@@ -113,7 +113,7 @@ serve_sa() {
   repo=$(fixture_repo "$fixture")
   spec=$(fixture_sa_spec "$fixture")
   cd "$repo"
-  exec "$sa_bin" --no-open --port "$port" "$spec"
+  exec "$sa_bin" diff open-review --spec "$spec" --no-open --port "$port"
 }
 
 serve_difit() {

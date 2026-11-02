@@ -4,7 +4,7 @@ set -euo pipefail
 if [ "${1:-}" = "--once" ]; then
   bin=${2:?missing binary}
   out=$(mktemp)
-  "$bin" --serve >"$out" 2>&1 &
+  "$bin" --output text --query GraphqlUrl server start-server >"$out" 2>&1 &
   pid=$!
   cleanup() {
     kill "$pid" 2>/dev/null || true
@@ -14,7 +14,7 @@ if [ "${1:-}" = "--once" ]; then
   trap cleanup EXIT INT TERM
   url=""
   for _ in $(seq 1 500); do
-    url=$(sed -n 's/^graphql at  \(http:\/\/.*\/api\/graphql\)$/\1/p' "$out" | tail -n 1)
+    url=$(grep -m1 -o '^http://.*/api/graphql$' "$out" || true)
     if [ -n "$url" ]; then
       break
     fi

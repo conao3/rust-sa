@@ -1913,17 +1913,6 @@ fn spawn_watcher(tx: broadcast::Sender<String>, root: PathBuf) {
     });
 }
 
-pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    run_with_port_callback(|_| {}).await
-}
-
-pub async fn run_with_port_callback<F>(on_bound: F) -> Result<(), Box<dyn std::error::Error>>
-where
-    F: FnOnce(u16),
-{
-    run_with_port(None, on_bound).await
-}
-
 pub async fn run_on_port_with_callback<F>(
     port: Option<u16>,
     on_bound: F,
@@ -1950,17 +1939,6 @@ where
     let listener = TcpListener::bind(addr).await?;
     let bound = listener.local_addr()?;
     on_bound(bound.port());
-    if let Ok(portless_url) = std::env::var("PORTLESS_URL") {
-        println!("graphql at  {portless_url}/api/graphql");
-        println!("diff text   {portless_url}/api/diff?rev=HEAD");
-        println!("blob text   {portless_url}/api/blob?rev=HEAD&path=README.md");
-        println!("sse events  {portless_url}/api/events");
-    } else {
-        println!("graphql at  http://{bound}/api/graphql");
-        println!("diff text   http://{bound}/api/diff?rev=HEAD");
-        println!("blob text   http://{bound}/api/blob?rev=HEAD&path=README.md");
-        println!("sse events  http://{bound}/api/events");
-    }
     axum::serve(listener, app).await?;
     Ok(())
 }

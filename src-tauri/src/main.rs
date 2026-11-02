@@ -1,5 +1,13 @@
+mod cli;
+
 use std::path::Path;
 
+#[cfg(feature = "desktop")]
+use cli::DesktopCommand;
+use cli::{
+    Bytes, Cli, CliError, Command, DiffCommand, GetGraphqlSchemaOutput, GlobalArgs, OpenReviewArgs,
+    OpenReviewOutput, OutputFormat, SchemaCommand, ServerCommand, ServerEndpoints, StartServerArgs,
+};
 use conao3_sa::server::{build_schema, register_stdin_patch, spec_to_diff_args};
 
 #[cfg(feature = "desktop")]
@@ -98,70 +106,6 @@ fn backend_error_to_string(err: BackendError) -> String {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct CliOptions {
-    schema: bool,
-    serve: bool,
-    no_open: bool,
-    port: Option<u16>,
-    spec: Option<String>,
-}
-
-fn usage() -> &'static str {
-    "usage: sa [--schema | --serve] [--no-open] [--port <port>] [<spec>|-]"
-}
-
-fn parse_args(args: &[String]) -> Result<CliOptions, String> {
-    let mut out = CliOptions {
-        schema: false,
-        serve: false,
-        no_open: false,
-        port: None,
-        spec: None,
-    };
-    let mut i = 0;
-    while i < args.len() {
-        let arg = &args[i];
-        if arg == "--schema" {
-            out.schema = true;
-        } else if arg == "--serve" {
-            out.serve = true;
-        } else if arg == "--no-open" {
-            out.no_open = true;
-        } else if arg == "--port" {
-            i += 1;
-            let Some(value) = args.get(i) else {
-                return Err("--port requires a value".into());
-            };
-            out.port = Some(parse_port(value)?);
-        } else if let Some(value) = arg.strip_prefix("--port=") {
-            out.port = Some(parse_port(value)?);
-        } else if arg == "--help" || arg == "-h" {
-            return Err(usage().into());
-        } else if arg.starts_with("--") {
-            return Err(format!("unknown option: {arg}"));
-        } else if out.spec.is_none() {
-            out.spec = Some(arg.clone());
-        } else {
-            return Err(format!("unexpected argument: {arg}"));
-        }
-        i += 1;
-    }
-    if out.schema && (out.serve || out.no_open || out.port.is_some() || out.spec.is_some()) {
-        return Err("--schema cannot be combined with other options".into());
-    }
-    if out.serve && out.spec.is_some() {
-        return Err("--serve cannot be combined with <spec>".into());
-    }
-    Ok(out)
-}
-
-fn parse_port(value: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| format!("invalid port: {value}"))
-}
-
 fn percent_encode(input: &str) -> String {
     input
         .bytes()
@@ -213,76 +157,6 @@ fn open_browser(url: &str) -> Result<(), String> {
     }
 }
 
-fn run_runtime<F>(f: F) -> !
-where
-    F: std::future::Future<Output = Result<(), Box<dyn std::error::Error>>>,
-{
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("failed to start tokio runtime");
-    if let Err(err) = runtime.block_on(f) {
-        eprintln!("backend exited: {err}");
-        std::process::exit(1);
-    }
-    std::process::exit(0);
-}
-
-fn run_cli(spec: String, no_open: bool, port: Option<u16>) -> ! {
-    if spec == "-" {
-        run_stdin_cli(no_open, port);
-    }
-    let cwd = std::env::current_dir().expect("failed to get current directory");
-    let repo = match repo_root(&cwd) {
-        Ok(repo) => repo,
-        Err(err) => {
-            eprintln!("{err}");
-            std::process::exit(1);
-        }
-    };
-    let _ = spec_to_diff_args(&spec);
-    let encoded_spec = percent_encode(&spec);
-    let encoded_repo = percent_encode(&repo);
-    run_runtime(conao3_sa::server::run_on_port_with_callback(
-        port,
-        move |port| {
-            let url = format!("http://127.0.0.1:{port}/compare/{encoded_spec}?repo={encoded_repo}");
-            if no_open {
-                println!("url        {url}");
-            } else {
-                println!("opening    {url}");
-                if let Err(err) = open_browser(&url) {
-                    eprintln!("{err}");
-                }
-            }
-        },
-    ))
-}
-
-fn run_stdin_cli(no_open: bool, port: Option<u16>) -> ! {
-    use std::io::Read;
-    let mut patch = Vec::new();
-    if let Err(err) = std::io::stdin().read_to_end(&mut patch) {
-        eprintln!("read stdin failed: {err}");
-        std::process::exit(1);
-    }
-    let patch_id = register_stdin_patch(patch);
-    run_runtime(conao3_sa::server::run_on_port_with_callback(
-        port,
-        move |port| {
-            let url = format!("http://127.0.0.1:{port}/compare/stdin?patch={patch_id}");
-            if no_open {
-                println!("url        {url}");
-            } else {
-                println!("opening    {url}");
-                if let Err(err) = open_browser(&url) {
-                    eprintln!("{err}");
-                }
-            }
-        },
-    ))
-}
-
 #[cfg(feature = "desktop")]
 fn run_desktop() {
     tauri::Builder::default()
@@ -310,90 +184,142 @@ fn run_desktop() {
         .expect("error while running tauri application");
 }
 
-#[cfg(not(feature = "desktop"))]
-fn run_desktop() {
-    eprintln!("{}", usage());
-    std::process::exit(1);
+fn run_runtime<F>(f: F) -> Result<(), CliError>
+where
+    F: std::future::Future<Output = Result<(), Box<dyn std::error::Error>>>,
+{
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| CliError::Other(format!("failed to start tokio runtime: {err}")))?;
+    runtime
+        .block_on(f)
+        .map_err(|err| CliError::Other(format!("backend exited: {err}")))
+}
+
+fn endpoints(port: u16) -> ServerEndpoints {
+    let base_url = std::env::var("PORTLESS_URL")
+        .map(|url| url.trim_end_matches('/').to_string())
+        .unwrap_or_else(|_| format!("http://127.0.0.1:{port}"));
+    ServerEndpoints {
+        graphql_url: format!("{base_url}/api/graphql"),
+        diff_url: format!("{base_url}/api/diff"),
+        blob_url: format!("{base_url}/api/blob"),
+        events_url: format!("{base_url}/api/events"),
+        base_url,
+    }
+}
+
+fn emit_or_exit<T: serde::Serialize>(global: &GlobalArgs, output: &T) {
+    let value = serde_json::to_value(output).expect("output serializes");
+    if let Err(err) = cli::emit(global, &value) {
+        eprintln!("{}", err.message());
+        std::process::exit(err.exit_code());
+    }
+}
+
+fn open_review(global: &GlobalArgs, args: OpenReviewArgs) -> Result<(), CliError> {
+    let open = !args.no_open;
+    let path = match (args.spec, args.patch) {
+        (Some(spec), None) => {
+            let cwd = std::env::current_dir().map_err(|err| {
+                CliError::Other(format!("failed to get current directory: {err}"))
+            })?;
+            let repo = repo_root(&cwd).map_err(CliError::Target)?;
+            let _ = spec_to_diff_args(&spec);
+            format!(
+                "/compare/{}?repo={}",
+                percent_encode(&spec),
+                percent_encode(&repo)
+            )
+        }
+        (None, Some(Bytes(patch))) => {
+            let patch_id = register_stdin_patch(patch.to_vec());
+            format!("/compare/stdin?patch={patch_id}")
+        }
+        _ => {
+            return Err(CliError::Param(
+                "one of --spec or --patch is required".into(),
+            ));
+        }
+    };
+    if global.debug {
+        eprintln!("[debug] review path: {path}");
+    }
+    let global = global.clone();
+    run_runtime(conao3_sa::server::run_on_port_with_callback(
+        args.port,
+        move |port| {
+            let review_url = format!("http://127.0.0.1:{port}{path}");
+            let browser_opened = open
+                && match open_browser(&review_url) {
+                    Ok(()) => true,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        false
+                    }
+                };
+            emit_or_exit(
+                &global,
+                &OpenReviewOutput {
+                    review_url,
+                    browser_opened,
+                    endpoints: endpoints(port),
+                },
+            );
+        },
+    ))
+}
+
+fn start_server(global: &GlobalArgs, args: StartServerArgs) -> Result<(), CliError> {
+    let global = global.clone();
+    run_runtime(conao3_sa::server::run_on_port_with_callback(
+        args.port,
+        move |port| emit_or_exit(&global, &endpoints(port)),
+    ))
+}
+
+fn get_graphql_schema(global: &GlobalArgs) -> Result<(), CliError> {
+    let output = GetGraphqlSchemaOutput {
+        sdl: build_schema().sdl(),
+    };
+    let value = serde_json::to_value(output).map_err(|err| CliError::Other(err.to_string()))?;
+    cli::emit(global, &value)
+}
+
+fn execute(cli: Cli) -> Result<(), CliError> {
+    match cli.command {
+        Command::Diff(DiffCommand::OpenReview(args)) => open_review(&cli.global, args),
+        Command::Server(ServerCommand::StartServer(args)) => start_server(&cli.global, args),
+        Command::Schema(SchemaCommand::GetGraphqlSchema(_)) => get_graphql_schema(&cli.global),
+        #[cfg(feature = "desktop")]
+        Command::Desktop(DesktopCommand::StartApp(_)) => {
+            run_desktop();
+            Ok(())
+        }
+    }
 }
 
 fn main() {
-    let args = std::env::args().skip(1).collect::<Vec<_>>();
-    let options = match parse_args(&args) {
-        Ok(options) => options,
-        Err(err) => {
-            if err == usage() {
-                println!("{err}");
-                return;
-            }
-            eprintln!("{err}");
-            eprintln!("{}", usage());
-            std::process::exit(1);
-        }
-    };
-    if options.schema {
-        print!("{}", build_schema().sdl());
-    } else if options.serve {
-        run_runtime(conao3_sa::server::run_on_port_with_callback(
-            options.port,
-            |_| {},
-        ));
-    } else if let Some(spec) = options.spec {
-        run_cli(spec, options.no_open, options.port);
-    } else if options.port.is_some() || options.no_open {
-        eprintln!("{}", usage());
-        std::process::exit(1);
-    } else {
+    let args = std::env::args_os().collect::<Vec<_>>();
+    #[cfg(feature = "desktop")]
+    if args.len() == 1 {
         run_desktop();
+        return;
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn s(args: &[&str]) -> Vec<String> {
-        args.iter().map(|arg| arg.to_string()).collect()
-    }
-
-    #[test]
-    fn parses_spec_flags() {
-        assert_eq!(
-            parse_args(&s(&["--no-open", "--port", "9000", "HEAD~1..HEAD"])).unwrap(),
-            CliOptions {
-                schema: false,
-                serve: false,
-                no_open: true,
-                port: Some(9000),
-                spec: Some("HEAD~1..HEAD".into()),
+    let code = match cli::parse(args) {
+        cli::Parsed::Exit(code) => code,
+        cli::Parsed::Run(_, Some(skeleton)) => {
+            print!("{}", cli::render(OutputFormat::Json, &skeleton));
+            0
+        }
+        cli::Parsed::Run(cli, None) => match execute(cli) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{}", err.message());
+                err.exit_code()
             }
-        );
-    }
-
-    #[test]
-    fn parses_serve_port() {
-        assert_eq!(
-            parse_args(&s(&["--serve", "--port=9001"])).unwrap(),
-            CliOptions {
-                schema: false,
-                serve: true,
-                no_open: false,
-                port: Some(9001),
-                spec: None,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_stdin_spec() {
-        assert_eq!(
-            parse_args(&s(&["--no-open", "-"])).unwrap(),
-            CliOptions {
-                schema: false,
-                serve: false,
-                no_open: true,
-                port: None,
-                spec: Some("-".into()),
-            }
-        );
-    }
+        },
+    };
+    std::process::exit(code);
 }

@@ -1,10 +1,10 @@
 .PHONY: dev
 dev:
-	portless sa-api cargo watch -x 'run --bin sa -- --serve'
+	portless sa-api cargo watch -x 'run --bin sa -- server start-server'
 
 .PHONY: schema
 schema:
-	cargo run -q --bin sa -- --schema > ../frontend/schema.graphql
+	cargo run -q --bin sa -- --output text schema get-graphql-schema > ../frontend/schema.graphql
 
 .PHONY: dev-tauri
 dev-tauri:
