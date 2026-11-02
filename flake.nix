@@ -24,26 +24,15 @@
       perSystem =
         { self', system, ... }:
         let
-          overlay =
-            final: prev:
-            let
-              nodejs = prev.nodejs_latest;
-              pnpm = prev.pnpm.override { nodejs-slim = nodejs; };
-            in
-            {
-              inherit
-                nodejs
-                pnpm
-                ;
-            };
-
           pkgs = import inputs.nixpkgs {
             inherit system;
             overlays = [
               inputs.rust-overlay.overlays.default
-              overlay
             ];
           };
+
+          nodejs = pkgs.nodejs_latest;
+          pnpm = pkgs.pnpm.override { nodejs-slim = nodejs; };
 
           rustToolchain = pkgs.rust-bin.stable.latest.default.override {
             extensions = [
@@ -110,7 +99,7 @@
                 version
                 src
                 ;
-              pnpm = pkgs.pnpm;
+              inherit pnpm;
               postPatch = "cd ${finalAttrs.pnpmRoot}";
               fetcherVersion = 4;
               hash = "sha256-pxHgN1Zo9l18lFklB7LtK4FswglklCCamSFeYfk6tVQ=";
