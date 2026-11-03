@@ -242,7 +242,7 @@ make -C src-tauri dev
 make -C frontend dev
 ```
 
-`devo run` wires both processes as a tmux session named `rust-sa`.
+`devo session start-session` wires both processes as a tmux session named `rust-sa`.
 
 ## Bench harness
 
