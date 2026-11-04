@@ -57,7 +57,7 @@
 
           tauriBuildInputs =
             with pkgs;
-            lib.optionals stdenv.isLinux (
+            lib.optionals stdenv.hostPlatform.isLinux (
               [
                 webkitgtk_4_1
                 gtk3
@@ -73,7 +73,7 @@
               ]
               ++ gstPlugins
             )
-            ++ lib.optionals stdenv.isDarwin [ ];
+            ++ lib.optionals stdenv.hostPlatform.isDarwin [ ];
 
           conao3-sa = rustPlatform.buildRustPackage (finalAttrs: {
             pname = "conao3-sa";
@@ -114,7 +114,7 @@
                 pnpm
                 pnpmConfigHook
               ]
-              ++ lib.optionals stdenv.isLinux [
+              ++ lib.optionals stdenv.hostPlatform.isLinux [
                 pkg-config
                 wrapGAppsHook3
               ];
