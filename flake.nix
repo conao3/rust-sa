@@ -162,6 +162,7 @@
 
           apps.default = {
             type = "app";
+            meta.description = "Review the local git diff in the browser or the desktop app";
             program = "${self'.packages.default}/bin/sa";
           };
 
