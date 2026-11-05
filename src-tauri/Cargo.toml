@@ -59,4 +59,3 @@ futures = "0.3"
 rust-embed = { version = "8", features = ["axum", "interpolate-folder-path"] }
 mime_guess = "2"
 clap = { version = "4.6.7", features = ["derive"] }
-jmespath = "0.5.0"

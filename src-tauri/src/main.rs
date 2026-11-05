@@ -6,7 +6,7 @@ use std::path::Path;
 use cli::DesktopCommand;
 use cli::{
     Bytes, Cli, CliError, Command, DiffCommand, GetGraphqlSchemaOutput, GlobalArgs, OpenReviewArgs,
-    OpenReviewOutput, OutputFormat, SchemaCommand, ServerCommand, ServerEndpoints, StartServerArgs,
+    OpenReviewOutput, SchemaCommand, ServerCommand, ServerEndpoints, StartServerArgs,
 };
 use conao3_sa::server::{build_schema, register_stdin_patch, spec_to_diff_args};
 
@@ -210,12 +210,9 @@ fn endpoints(port: u16) -> ServerEndpoints {
     }
 }
 
-fn emit_or_exit<T: serde::Serialize>(global: &GlobalArgs, output: &T) {
+fn emit_output<T: serde::Serialize>(global: &GlobalArgs, output: &T) {
     let value = serde_json::to_value(output).expect("output serializes");
-    if let Err(err) = cli::emit(global, &value) {
-        eprintln!("{}", err.message());
-        std::process::exit(err.exit_code());
-    }
+    cli::emit(global, &value);
 }
 
 fn open_review(global: &GlobalArgs, args: OpenReviewArgs) -> Result<(), CliError> {
@@ -259,7 +256,7 @@ fn open_review(global: &GlobalArgs, args: OpenReviewArgs) -> Result<(), CliError
                         false
                     }
                 };
-            emit_or_exit(
+            emit_output(
                 &global,
                 &OpenReviewOutput {
                     review_url,
@@ -275,7 +272,7 @@ fn start_server(global: &GlobalArgs, args: StartServerArgs) -> Result<(), CliErr
     let global = global.clone();
     run_runtime(conao3_sa::server::run_on_port_with_callback(
         args.port,
-        move |port| emit_or_exit(&global, &endpoints(port)),
+        move |port| emit_output(&global, &endpoints(port)),
     ))
 }
 
@@ -284,7 +281,8 @@ fn get_graphql_schema(global: &GlobalArgs) -> Result<(), CliError> {
         sdl: build_schema().sdl(),
     };
     let value = serde_json::to_value(output).map_err(|err| CliError::Other(err.to_string()))?;
-    cli::emit(global, &value)
+    cli::emit(global, &value);
+    Ok(())
 }
 
 fn execute(cli: Cli) -> Result<(), CliError> {
@@ -309,11 +307,7 @@ fn main() {
     }
     let code = match cli::parse(args) {
         cli::Parsed::Exit(code) => code,
-        cli::Parsed::Run(_, Some(skeleton)) => {
-            print!("{}", cli::render(OutputFormat::Json, &skeleton));
-            0
-        }
-        cli::Parsed::Run(cli, None) => match execute(cli) {
+        cli::Parsed::Run(cli) => match execute(cli) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{}", err.message());

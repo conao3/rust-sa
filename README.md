@@ -92,7 +92,7 @@ sa diff open-review --spec working --no-open --port 7777
 # Headless backend with embedded SPA static serving.
 sa server start-server
 sa server start-server --port 7777
-sa --output text --query GraphqlUrl server start-server
+sa server start-server | jq -r .GraphqlUrl
 
 # GraphQL SDL (frontend/schema.graphql is generated with this).
 sa --output text schema get-graphql-schema
@@ -113,16 +113,10 @@ Parameters:
 Common rules:
 
 - Global options: `--output json|text|table` (default `json`),
-  `--query <JMESPath>`, `--debug` (argv and parsed parameters to stderr),
-  `--version`.
+  `--debug` (argv and parsed parameters to stderr), `--version`.
 - `help` works at every level: `sa help`, `sa diff help`,
   `sa diff open-review help`.
 - A value starting with `file://` is read from that file.
-- `--cli-input-json <json>` passes all parameters as JSON keyed by the
-  PascalCase parameter name (`{"Spec": "HEAD~1..HEAD", "Open": false}`);
-  parameters on the command line take precedence.
-  `--generate-cli-skeleton input|output` prints the input or output
-  skeleton.
 - Output keys are PascalCase. `server start-server` prints `BaseUrl`,
   `GraphqlUrl`, `DiffUrl`, `BlobUrl`, `EventsUrl` once the port is bound;
   `diff open-review` adds `ReviewUrl` and `BrowserOpened`. `PORTLESS_URL`
@@ -167,7 +161,7 @@ state live in browser `localStorage`.
 ```
 src-tauri/      Rust backend (axum + GraphQL + git CLI)
   src/main.rs        CLI entry and Tauri shell (executable: sa)
-  src/cli.rs         CLI grammar (clap), output formats, cli-input-json
+  src/cli.rs         CLI grammar (clap) and output formats
   src/server.rs      axum + GraphQL backend (also reachable via `sa server start-server`)
 frontend/       TanStack Start frontend
   src/routes/   __root, /, /browse, /compare/$, /graph, /preference, /design, /health
