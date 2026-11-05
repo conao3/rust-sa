@@ -131,8 +131,13 @@
                 echo "could not find installed sa executable" >&2
                 exit 1
               fi
-              makeWrapper "$candidate" "$out/bin/sa" \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git ]}
+              if [ "$candidate" = "$out/bin/sa" ]; then
+                wrapProgram "$out/bin/sa" \
+                  --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git ]}
+              else
+                makeWrapper "$candidate" "$out/bin/sa" \
+                  --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git ]}
+              fi
             '';
 
             passthru.pnpmDeps = finalAttrs.pnpmDeps;
