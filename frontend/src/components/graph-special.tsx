@@ -1,6 +1,6 @@
 import { CircleDot, FilePen } from 'lucide-react'
 import type { MouseEvent } from 'react'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export type SpecialId = 'WORKING' | 'STAGING'
 

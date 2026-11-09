@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import { Button } from '#/components/ui/button'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export function RefreshButton({
   isRefreshing,

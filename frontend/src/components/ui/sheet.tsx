@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Dialog, Heading, Modal, ModalOverlay, type ModalOverlayProps } from 'react-aria-components'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export interface SheetProps extends Omit<ModalOverlayProps, 'children'> {
   title?: ReactNode

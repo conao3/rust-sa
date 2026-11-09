@@ -4,7 +4,7 @@ import {
   type ToggleButtonGroupProps,
   type ToggleButtonProps,
 } from 'react-aria-components'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export function Segmented({ className, ...rest }: ToggleButtonGroupProps) {
   return (

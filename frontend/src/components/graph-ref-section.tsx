@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, type GitBranch, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { Button as AriaButton, Input as AriaInput, SearchField } from 'react-aria-components'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 import { fuzzyScore } from '#/lib/fuzzy'
 import { usePreference } from '#/lib/preference'
 

@@ -1,5 +1,5 @@
 import { Button as AriaButton, type ButtonProps as AriaButtonProps } from 'react-aria-components'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 const variants = {
   primary: 'bg-rust text-cream border-rust hover:bg-rust-deep hover:border-rust-deep',

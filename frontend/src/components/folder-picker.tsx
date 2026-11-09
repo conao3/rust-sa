@@ -14,7 +14,7 @@ import {
 } from 'react-aria-components'
 import { Button } from '#/components/ui/button'
 import { fuzzyScore } from '#/lib/fuzzy'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export interface FolderPickerProps extends Omit<ModalOverlayProps, 'children'> {
   onPick: (path: string) => void

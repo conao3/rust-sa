@@ -1,5 +1,5 @@
 import { Check, Circle } from 'lucide-react'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export interface ViewedCheckProps {
   isOn: boolean

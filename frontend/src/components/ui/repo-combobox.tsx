@@ -10,7 +10,7 @@ import {
   Popover,
 } from 'react-aria-components'
 import type { RefObject } from 'react'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export interface RepoOption {
   path: string

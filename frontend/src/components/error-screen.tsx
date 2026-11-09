@@ -4,6 +4,7 @@ import { isTauri } from '#/lib/apollo'
 
 export function ErrorScreen({ error, info, reset }: ErrorComponentProps) {
   const [copied, setCopied] = useState(false)
+  const [time] = useState(() => new Date().toISOString())
 
   const err = error instanceof Error ? error : new Error(String(error))
   const url = typeof window !== 'undefined' ? window.location.href : 'unknown'
@@ -12,7 +13,7 @@ export function ErrorScreen({ error, info, reset }: ErrorComponentProps) {
 
   const diagnostic = [
     `[rust-sa diagnostic]`,
-    `time: ${new Date().toISOString()}`,
+    `time: ${time}`,
     `platform: ${platform}`,
     `url: ${url}`,
     `user-agent: ${ua}`,

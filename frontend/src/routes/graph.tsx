@@ -35,7 +35,7 @@ import { Button } from '#/components/ui/button'
 import { RefreshButton } from '#/components/ui/refresh-button'
 import { ResizeHandle } from '#/components/ui/resize-handle'
 import { Tag } from '#/components/ui/tag'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 // DiffView pulls in pierre/diffs + every shiki grammar (~1 MB of JS). Lazy-load
 // it so the initial /graph paint doesn't pay for diff rendering until the user
 // has actually picked a commit and PREVIEW_FILES_QUERY has resolved.
@@ -205,31 +205,40 @@ function GraphPage() {
   const dragStartRef = useRef<string | null>(null)
   const draggedRef = useRef(false)
 
-  const consumeDragFlag = (): boolean => {
+  const consumeDragFlag = useCallback((): boolean => {
     if (draggedRef.current) {
       draggedRef.current = false
       return true
     }
     return false
-  }
-
-  const onRowClick = useCallback((e: MouseEvent, sha: string) => {
-    if (consumeDragFlag()) return
-    if (e.ctrlKey || e.metaKey) setHead(sha)
-    else setBase(sha)
   }, [])
 
-  const onSpecialClick = useCallback((e: MouseEvent, id: SpecialId) => {
-    if (consumeDragFlag()) return
-    if (e.ctrlKey || e.metaKey) setHead(id)
-    else setBase(id)
-  }, [])
+  const onRowClick = useCallback(
+    (e: MouseEvent, sha: string) => {
+      if (consumeDragFlag()) return
+      if (e.ctrlKey || e.metaKey) setHead(sha)
+      else setBase(sha)
+    },
+    [consumeDragFlag],
+  )
 
-  const onRefClick = useCallback((e: MouseEvent, name: string) => {
-    if (consumeDragFlag()) return
-    if (e.ctrlKey || e.metaKey) setHead(name)
-    else setBase(name)
-  }, [])
+  const onSpecialClick = useCallback(
+    (e: MouseEvent, id: SpecialId) => {
+      if (consumeDragFlag()) return
+      if (e.ctrlKey || e.metaKey) setHead(id)
+      else setBase(id)
+    },
+    [consumeDragFlag],
+  )
+
+  const onRefClick = useCallback(
+    (e: MouseEvent, name: string) => {
+      if (consumeDragFlag()) return
+      if (e.ctrlKey || e.metaKey) setHead(name)
+      else setBase(name)
+    },
+    [consumeDragFlag],
+  )
 
   const openSpecDiff = useCallback(
     (spec: string) => {

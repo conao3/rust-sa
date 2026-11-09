@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from 'react'
-import clsx from 'clsx'
+import { clsx } from 'clsx'
 
 export function Kbd({ className, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return (
