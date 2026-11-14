@@ -15,7 +15,7 @@
     "@apollo/client": "^4.3.7",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@pierre/diffs": "^1.6.4",
-    "@pierre/trees": "1.0.0-beta.6",
+    "@pierre/trees": "1.0.0",
     "@tailwindcss/vite": "^4.3.5",
     "@tanstack/react-devtools": "0.10.14",
     "@tanstack/react-hotkeys": "^0.22.2",
