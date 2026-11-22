@@ -102,7 +102,7 @@
               inherit pnpm;
               postPatch = "cd ${finalAttrs.pnpmRoot}";
               fetcherVersion = 4;
-              hash = "sha256-190jFA7QHSqelVsMDohEOOif+0PjtmZqU9MX/DDfkJc=";
+              hash = "sha256-zZ76n1k5AdEAh4LfKIog4WT5lUBNkoUYNeW3fyVAFks=";
             };
 
             nativeBuildInputs =
