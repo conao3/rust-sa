@@ -318,7 +318,7 @@ function GraphPage() {
         head={
           baseIsSpecial && !head ? undefined : head ? (specialLabel(head) ?? shortSha(head)) : '—'
         }
-        separator={baseIsSpecial && !head ? undefined : threeDot ? '···' : '··'}
+        separator={baseIsSpecial && !head ? undefined : threeDot ? '...' : '..'}
         mode={mode}
         onModeChange={setMode}
         view="graph"
@@ -432,7 +432,7 @@ function GraphPage() {
                 </h2>
                 <p className="m-0 font-sans text-sm text-mute max-w-md">
                   Click to set <span className="text-rust font-medium">base</span> (older)
-                  {' · '}⌃ / ⌘ + click to set <span className="text-moss font-medium">head</span>{' '}
+                  {', '}⌃ / ⌘ + click to set <span className="text-moss font-medium">head</span>{' '}
                   (newer).
                 </p>
                 <p className="m-0 font-sans text-xs text-faint max-w-md">
@@ -622,7 +622,6 @@ function CommitMeta({ commit }: { commit: Commit | null }) {
         {commit && (
           <>
             <span>{commit.author}</span>
-            <span>·</span>
             <span>{commit.when}</span>
           </>
         )}
@@ -826,12 +825,12 @@ function GraphSummary({
         onClick={onToggleThreeDot}
         aria-label={
           threeDot
-            ? '··· three-dot range, switch to two-dot'
-            : '·· two-dot range, switch to three-dot'
+            ? '... three-dot range, switch to two-dot'
+            : '.. two-dot range, switch to three-dot'
         }
         className="text-mute hover:text-ink cursor-pointer px-1 -mx-1 rounded-sm"
       >
-        {threeDot ? '···' : '··'}
+        {threeDot ? '...' : '..'}
       </button>
       <span className="inline-flex items-center gap-1.5 text-ink">
         <span className="w-2 h-2 rounded-full inline-block bg-moss" />

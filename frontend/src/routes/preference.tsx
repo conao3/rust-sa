@@ -27,7 +27,6 @@ function PreferencePage() {
             <ArrowLeft size={16} aria-hidden="true" />
             <span className="font-mono text-xs">home</span>
           </Link>
-          <span className="font-mono text-xs text-faint">·</span>
           <span className="font-mono text-sm font-medium text-ink">preferences</span>
           <GitHubLink />
         </div>

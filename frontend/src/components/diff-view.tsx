@@ -351,8 +351,7 @@ function DiffSearchPanel({
       {activeHit && (
         <div className="border-t border-hairline-soft px-3 py-2 font-mono text-xs text-mute truncate">
           <span className="text-ink">{activeHit.path}</span>
-          <span className="px-1">·</span>
-          <span>line {activeHit.rowIndex + 1}</span>
+          <span className="pl-2">line {activeHit.rowIndex + 1}</span>
         </div>
       )}
     </div>
@@ -826,7 +825,7 @@ function FileBlock({
       </div>
       {isActiveSearchHit && (
         <div className="px-3 py-1.5 border-b border-amber bg-amber-soft font-mono text-xs text-amber">
-          line {activeSearchHit.rowIndex + 1} ·{' '}
+          line {activeSearchHit.rowIndex + 1}:{' '}
           <span className="text-ink">{activeSearchHit.preview}</span>
         </div>
       )}

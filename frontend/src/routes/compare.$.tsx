@@ -49,14 +49,14 @@ interface CompareSearch {
   hit?: number
 }
 
-function parseSpec(spec: string): { base: string; head: string; separator: '··' | '···' | null } {
+function parseSpec(spec: string): { base: string; head: string; separator: '..' | '...' | null } {
   if (spec.includes('...')) {
     const [base, head] = spec.split('...', 2)
-    return { base, head, separator: '···' }
+    return { base, head, separator: '...' }
   }
   if (spec.includes('..')) {
     const [base, head] = spec.split('..', 2)
-    return { base, head, separator: '··' }
+    return { base, head, separator: '..' }
   }
   return { base: spec, head: spec, separator: null }
 }

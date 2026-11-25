@@ -52,7 +52,7 @@ export function CommentComposer({
         />
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex-1 min-w-0 truncate font-mono text-xs text-faint">
-            ⌘↵ submit · esc cancel
+            ⌘↵ submit, esc cancel
           </span>
           <Button
             variant="ghost"

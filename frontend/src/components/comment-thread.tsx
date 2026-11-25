@@ -37,7 +37,7 @@ export function CommentThread({ comments, onDelete }: CommentThreadProps) {
                 {isClaude && <Sparkles size={16} aria-hidden="true" />}
                 {c.author}
               </span>
-              <span>· {timeAgo(c.createdAt)}</span>
+              <span>{timeAgo(c.createdAt)}</span>
             </div>
             <div className="text-sm leading-normal text-ink-2 whitespace-pre-wrap">{c.body}</div>
             <div className="flex items-center gap-2">

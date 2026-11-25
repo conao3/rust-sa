@@ -38,7 +38,7 @@ function DesignPage() {
         </Group>
       </Section>
 
-      <Section tag="02" title="Segmented · pills">
+      <Section tag="02" title="Segmented pills">
         <Group label="ToggleButtonGroup">
           <Segmented
             selectedKeys={[mode]}
@@ -57,7 +57,7 @@ function DesignPage() {
         </Group>
       </Section>
 
-      <Section tag="03" title="Keys · overlay">
+      <Section tag="03" title="Keys overlay">
         <Group label="kbd">
           <Kbd>j</Kbd>
           <Kbd>k</Kbd>

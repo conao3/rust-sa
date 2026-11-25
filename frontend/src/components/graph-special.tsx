@@ -89,7 +89,6 @@ export function SpecialMeta({ special }: { special: SpecialId }) {
       <div className="flex items-center gap-3 font-mono text-xs">
         <Icon size={16} aria-hidden="true" className="text-amber" />
         <span className="text-amber uppercase tracking-widest font-medium">{def.label}</span>
-        <span className="text-mute">·</span>
         <span className="text-mute">{def.description}</span>
       </div>
       <h2 className="mt-2 m-0 font-serif text-xl tracking-tight text-ink">

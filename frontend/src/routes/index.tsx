@@ -275,7 +275,7 @@ function HomePage() {
 
       <footer className="border-t border-hairline mt-16">
         <div className="max-w-4xl mx-auto px-8 py-6 font-mono text-xs text-mute flex items-center justify-between">
-          <span>rust-sa · local git diff reviewer</span>
+          <span>rust-sa, local git diff reviewer</span>
           <a
             href="https://github.com/conao3/rust-sa"
             className="inline-flex items-center gap-1 text-rust hover:text-rust-deep"

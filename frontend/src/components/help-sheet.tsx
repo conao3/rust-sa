@@ -27,7 +27,7 @@ const GROUPS = [
     label: 'Display',
     items: [
       { keys: ['s'], action: 'Toggle split / unified' },
-      { keys: ['.'], action: 'Cycle density (compact · regular · comfy)' },
+      { keys: ['.'], action: 'Cycle density (compact / regular / comfy)' },
       { keys: ['g'], action: 'Open commit graph (compare picker)' },
       { keys: ['?'], action: 'Open / close this help' },
     ],
@@ -52,7 +52,7 @@ export function HelpSheet({ isOpen, onOpenChange }: HelpSheetProps) {
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       title="Keybindings"
-      hint="vim-flavoured · same bindings as difit where applicable"
+      hint="vim-flavoured, same bindings as difit where applicable"
     >
       <div className="grid grid-cols-2 gap-y-3 gap-x-8">
         {GROUPS.map((group) => (

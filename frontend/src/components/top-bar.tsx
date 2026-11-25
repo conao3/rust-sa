@@ -26,7 +26,7 @@ export type View = 'diff' | 'graph'
 export interface TopBarProps {
   base: string
   head?: string
-  separator?: '··' | '···'
+  separator?: '..' | '...'
   mode: Mode
   onModeChange: (mode: Mode) => void
   view: View
@@ -216,7 +216,7 @@ function ClearPromptsButton({ onPress, label }: { onPress: () => void; label: st
 export function TopBar({
   base,
   head,
-  separator = '···',
+  separator = '...',
   mode,
   onModeChange,
   view,
