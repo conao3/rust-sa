@@ -1,0 +1,233 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+permissions:
+  contents: read
+concurrency:
+  group: release
+env:
+  CRATE: conao3-sa
+  VERSION_FILES: src-tauri/Cargo.toml src-tauri/Cargo.lock
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  CARGO_TERM_COLOR: always
+defaults:
+  run:
+    shell: bash
+jobs:
+  check:
+    name: Bump and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Require the default branch
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Dispatch the release workflow from $DEFAULT_BRANCH."
+            exit 1
+          fi
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install the Tauri system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.9.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "26"
+      - name: Choose version
+        id: version
+        env:
+          BUMP: ${{ inputs.version_bump }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(cargo metadata --manifest-path src-tauri/Cargo.toml --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == env.CRATE) | .version')
+          IFS=. read -r major minor patch <<< "$current"
+          case "$BUMP" in
+            major) version="$((major + 1)).0.0" ;;
+            minor) version="$major.$((minor + 1)).0" ;;
+            patch) version="$major.$minor.$((patch + 1))" ;;
+          esac
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version" --jq "[.[] | select(.ref == \"refs/tags/v$version\")] | length")
+          if [[ "$existing" != 0 ]]; then
+            echo "::error::Tag v$version already exists."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" src-tauri/Cargo.toml
+          cargo update --workspace --manifest-path src-tauri/Cargo.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          read -ra files <<< "$VERSION_FILES"
+          git commit -m "Bump version to $VERSION" -- "${files[@]}"
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - name: Generate the GraphQL types
+        run: make -C frontend codegen
+      - name: Lint the frontend
+        run: make -C frontend lint
+      - name: Test the frontend
+        run: pnpm vitest run
+        working-directory: frontend
+      - name: Check and lint the backend
+        run: make -C src-tauri check
+      - name: Test the backend
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Check the headless build
+        run: cargo check --locked --no-default-features --manifest-path src-tauri/Cargo.toml
+      - name: Build the SPA
+        run: make dist
+      - name: Verify crate
+        run: cargo publish --locked --no-verify --dry-run --allow-dirty
+        working-directory: src-tauri
+      - name: Bundle the version commit
+        run: git bundle create "$RUNNER_TEMP/release.bundle" "$GITHUB_SHA..HEAD"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release.bundle
+          retention-days: 1
+
+  tag:
+    name: Push commit and tag
+    needs: [check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}
+      - name: Push commit and tag
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          git fetch "$RUNNER_TEMP/release.bundle" HEAD
+          commit=$(git rev-parse FETCH_HEAD)
+          if [[ "$(git rev-parse "$commit^")" != "$GITHUB_SHA" ]]; then
+            echo "::error::The version commit is not a child of $GITHUB_SHA."
+            exit 1
+          fi
+          read -ra allowed <<< "$VERSION_FILES"
+          while read -r file; do
+            if [[ " ${allowed[*]} " != *" $file "* ]]; then
+              echo "::error::The version commit changes $file."
+              exit 1
+            fi
+          done < <(git diff --name-only "$GITHUB_SHA" "$commit")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "$CRATE v$VERSION" "$commit"
+          git push --atomic origin "$commit:refs/heads/$DEFAULT_BRANCH" "refs/tags/v$VERSION"
+
+  publish:
+    name: Publish to crates.io
+    needs: [check, tag]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: v${{ needs.check.outputs.version }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.9.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "26"
+      - name: Build the SPA
+        run: |
+          pnpm -C frontend install --frozen-lockfile
+          make -C frontend codegen
+          make dist
+      - uses: rust-lang/crates-io-auth-action@v1.0.6
+        id: auth
+      - name: Publish crate
+        run: cargo publish --locked --no-verify --allow-dirty
+        working-directory: src-tauri
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  build-headless:
+    name: Build the headless binary
+    needs: [check, tag]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: v${{ needs.check.outputs.version }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.9.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "26"
+      - name: Build the SPA
+        run: |
+          pnpm -C frontend install --frozen-lockfile
+          make -C frontend codegen
+          make dist
+      - name: Build the binary
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          cargo build --locked --release --no-default-features --manifest-path src-tauri/Cargo.toml --bin sa
+          tar -C src-tauri/target/release -czf "sa-v$VERSION-linux-x86_64.tar.gz" sa
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: sa-linux-x86_64
+          path: sa-v${{ needs.check.outputs.version }}-linux-x86_64.tar.gz
+
+  github-release:
+    name: Create GitHub Release
+    needs: [check, publish, build-headless]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: sa-linux-x86_64
+          path: dist
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: gh release create "v$VERSION" dist/*.tar.gz --repo "$GITHUB_REPOSITORY" --verify-tag --title "$CRATE v$VERSION" --generate-notes
