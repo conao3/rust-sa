@@ -320,7 +320,7 @@ make fmt      # treefmt (rustfmt + prettier + nixfmt) + oxfmt --write
 gh workflow run release.yml --ref master -f version_bump=patch
 ```
 
-The `Release` workflow bumps the version in `src-tauri/Cargo.toml`, runs the CI checks for the backend and the frontend, pushes the version commit and the `v<version>` tag, publishes `conao3-sa` to crates.io with trusted publishing, builds the headless linux-x86_64 `sa` binary, and creates the GitHub Release with it. Choose `minor` or `major` for a larger bump.
+The `Release` workflow bumps the version in `src-tauri/Cargo.toml`, builds the SPA and verifies the crate, pushes the version commit and the `v<version>` tag, publishes `conao3-sa` to crates.io with trusted publishing, builds the headless linux-x86_64 `sa` binary, and creates the GitHub Release with it. Choose `minor` or `major` for a larger bump.
 
 ## License
 

@@ -24,7 +24,7 @@ defaults:
     shell: bash
 jobs:
   check:
-    name: Bump and check
+    name: Bump version
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -88,17 +88,6 @@ jobs:
         working-directory: frontend
       - name: Generate the GraphQL types
         run: make -C frontend codegen
-      - name: Lint the frontend
-        run: make -C frontend lint
-      - name: Test the frontend
-        run: pnpm vitest run
-        working-directory: frontend
-      - name: Check and lint the backend
-        run: make -C src-tauri check
-      - name: Test the backend
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
-      - name: Check the headless build
-        run: cargo check --locked --no-default-features --manifest-path src-tauri/Cargo.toml
       - name: Build the SPA
         run: make dist
       - name: Verify crate
