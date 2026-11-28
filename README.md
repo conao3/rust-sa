@@ -137,10 +137,11 @@ other client routes can be reloaded directly.
 
 ### Preferences
 
-Theme is persisted to `~/.config/sa/config.toml`. Review comments are
+Theme is persisted to `~/.config/sa/config.toml` and recent
+repositories to `~/.config/sa/recents.json`. Review comments are
 persisted as JSON under `~/.config/sa/comments/`, scoped by repository
-and diff content. Layout, density, pane widths, recents, and viewed
-state live in browser `localStorage`.
+and diff content. Layout, density, pane widths, and viewed state live
+in browser `localStorage`.
 
 ## Stack
 
@@ -317,11 +318,13 @@ make fmt      # treefmt (rustfmt + prettier + nixfmt) + oxfmt --write
   rebuilding `.next/`) never flicker the diff view.
 - React Compiler handles memoisation; `useMemo` / `useCallback` are
   avoided in application code.
-- Comments live in `localStorage`, keyed by rev; the model carries
-  `startLineNumber` / `endLineNumber` so multi-line ranges round-trip.
-- Theme is the only preference that goes to disk (`config.toml`); all
-  ephemeral display state (mode, density, pane widths, section
-  open/closed) stays in localStorage to avoid filesystem chatter.
+- Comments are stored as JSON under `~/.config/sa/comments/`, scoped by
+  repository and diff content; the model carries `startLineNumber` /
+  `endLineNumber` so multi-line ranges round-trip.
+- Theme (`config.toml`), recents (`recents.json`), and comments go to
+  disk under `~/.config/sa/`; ephemeral display state (mode, density,
+  pane widths, section open/closed) and viewed state stay in
+  localStorage to avoid filesystem chatter.
 
 ## Release
 
