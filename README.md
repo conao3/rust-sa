@@ -98,6 +98,10 @@ sa server start-server | jq -r .GraphqlUrl
 sa --output text schema get-graphql-schema
 ```
 
+![Diff review of a feature branch with a file tree, viewed marks and an inline comment](images/diff.png)
+
+The screenshots show a sample repository with made-up data, in the light theme.
+
 Parameters:
 
 - `--spec <string>`: any git rev, range, or the pseudos `working` /
@@ -178,6 +182,9 @@ flake.nix       Nix devShell (rust, node, pnpm, cargo-tauri, cargo-watch)
   tree on first paint; clicking a file fetches its content from
   `/api/blob` and renders it with Shiki. Blob & highlight are cached
   by URL/path so revisits are instant. `rev` defaults to `HEAD`.
+
+  ![Repository browser showing a TypeScript file next to the file tree](images/browse.png)
+
 - `/compare/$spec?repo=<abs>&w=1` — diff reviewer. `spec` accepts any
   git rev (`HEAD`, `main`, `v1.0`, `feature/foo`), a two-dot range
   (`main..feature`), or three-dot (`HEAD~3...HEAD`). The pseudos
@@ -196,6 +203,9 @@ flake.nix       Nix devShell (rust, node, pnpm, cargo-tauri, cargo-watch)
     **drag across rows** picks `base..head` in one gesture (with the
     intermediate commits tinted), **double-click** opens that commit's
     diff in `/compare`.
+
+  ![Commit graph with one commit selected and its diff beside the history](images/graph.png)
+
 - `/preference` — settings. Theme (light/dark) is persisted to
   `~/.config/sa/config.toml`; display options (layout, density,
   pane widths) live in localStorage.
