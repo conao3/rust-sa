@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { getApiOrigin, isTauri } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/api-origin'
+import { isTauri } from '#/lib/apollo'
 
 export interface DiffState {
   patch: string

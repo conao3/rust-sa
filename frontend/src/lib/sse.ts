@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { getApiOrigin, isTauri } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/api-origin'
+import { isTauri } from '#/lib/apollo'
 
 export function useEvents(repo: string, onMessage: () => void, debounceMs = 800) {
   const ref = useRef(onMessage)

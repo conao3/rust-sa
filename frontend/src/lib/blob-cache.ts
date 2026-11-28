@@ -1,4 +1,5 @@
-import { getApiOrigin, isTauri } from '#/lib/apollo'
+import { getApiOrigin } from '#/lib/api-origin'
+import { isTauri } from '#/lib/apollo'
 
 const cache = new Map<string, Promise<string>>()
 

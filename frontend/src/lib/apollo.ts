@@ -8,6 +8,7 @@ import {
 } from '@apollo/client'
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core'
 import { print, type DocumentNode } from 'graphql'
+import { getApiOrigin } from '#/lib/api-origin'
 
 declare global {
   // Set by Tauri when the document runs inside its webview.
@@ -16,11 +17,6 @@ declare global {
 
 export function isTauri(): boolean {
   return typeof globalThis !== 'undefined' && Boolean(globalThis.__TAURI_INTERNALS__)
-}
-
-export function getApiOrigin(): string {
-  // Browser / portless dev. Tauri requests go through IPC and ignore this.
-  return 'https://sa-api.localhost'
 }
 
 const tauriLink = new ApolloLink(
@@ -70,7 +66,7 @@ interface GraphQLResult<T> {
 /**
  * Run a GraphQL operation outside the React tree (route loaders etc.) using
  * the same transport rules as Apollo: Tauri webview goes through IPC, browsers
- * fall back to portless-proxied HTTPS. Accepts a codegen-emitted
+ * fall back to HTTP against `getApiOrigin()`. Accepts a codegen-emitted
  * TypedDocumentNode so callers don't have to spell out the generics.
  */
 export async function executeGraphQL<TData, TVariables>(
