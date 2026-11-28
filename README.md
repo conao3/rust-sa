@@ -138,7 +138,6 @@ persisted as JSON under `~/.config/sa/comments/`, scoped by repository
 and diff content. Layout, density, pane widths, recents, and viewed
 state live in browser `localStorage`.
 
-
 ## Stack
 
 - **Backend** (`src-tauri/`) — Rust, axum, async-graphql, Tauri 2.
@@ -272,11 +271,11 @@ measured from an already-running Chrome foreground tab with no CPU or
 network throttling.
 
 | Fixture | `sa` LCP mean | `difit 5.0.6` LCP mean |
-|---|---:|---:|
-| small | 1,023 ms | 728 ms |
-| medium | 1,473 ms | 733 ms |
-| large | 4,180 ms | 593 ms |
-| xlarge | 831 ms | 220 ms |
+| ------- | ------------: | ---------------------: |
+| small   |      1,023 ms |                 728 ms |
+| medium  |      1,473 ms |                 733 ms |
+| large   |      4,180 ms |                 593 ms |
+| xlarge  |        831 ms |                 220 ms |
 
 `difit` paints faster on every fixture in this run. The large fixture is
 the main remaining paint bottleneck for `sa`. `sa` is ahead on cold start
